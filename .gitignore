@@ -1,0 +1,22 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+build/
+.tsbuildinfo
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# Env files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Executables
+*Antigravity*.exe
+*.exe
