@@ -18,7 +18,7 @@
   background: #ffde59;
   padding: 0 40px;
   height: 64px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
 /* Brand (left) */
@@ -99,7 +99,7 @@
 }
 
 .lp-icon-btn:hover {
-  background: rgba(255, 49, 49, 0.12);
+  background: rgba(255,49,49,0.12);
   color: #ff3131;
 }
 
@@ -119,17 +119,4 @@
 .lp-login-btn:hover {
   background: #cc0000;
   transform: scale(1.03);
-}
-
-/* ════════════════════════════════
-   RESPONSIVE NAV
-   ════════════════════════════════ */
-@media (max-width: 900px) {
-  .lp-nav {
-    padding: 0 20px;
-  }
-
-  .lp-nav-links {
-    display: none;
-  }
 }

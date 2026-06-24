@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Login } from "./pages/Login";
 import { StallPicker } from "./pages/StallPicker";
 import { Menu } from "./components/Menu";
+import { Header } from "./components/Header";
 import { HomePage } from "./pages/LandingPage";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { VendorDashboard } from "./pages/VendorDashboard";
@@ -119,84 +120,23 @@ const [view, setView] = useState<AppView>("home");
     setView(previousView);
   };
 
-  const appHeader = (
-    <header className="app-header">
-      <div className="header-content">
-        <div className="header-brand">
-          <img src="/images/TUP logo.png" alt="TUP Logo" className="brand-logo" />
-          <div className="brand-title">
-            <span className="brand-subtitle">TUP</span>
-            <h2>FoodHub</h2>
-          </div>
-        </div>
-
-        <nav className="app-nav" aria-label="Primary navigation">
-          <button className="nav-link" onClick={() => handleNavigate("stall-picker")}>
-            Home
-          </button>
-          <button className="nav-link" onClick={() => handleNavigate("trends")}>
-            Trends
-          </button>
-          {token && role === "user" && (
-            <button className="nav-link" onClick={() => handleNavigate("orders")}>
-              My Orders
-            </button>
-          )}
-          <button className="nav-link" onClick={() => handleNavigate("about")}>
-            About
-          </button>
-        </nav>
-
-        <div className="header-actions">
-          {token ? (
-            <>
-              <button className="header-profile-trigger" type="button" onClick={() => handleNavigate("profile")}>
-                <div
-                  className="header-avatar"
-                  style={{
-                    backgroundImage: userProfilePic
-                      ? `url(${userProfilePic})`
-                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    backgroundSize: "cover",
-                    backgroundPosition: "center"
-                  }}
-                >
-                  {!userProfilePic && (
-                    <span>{(userName ?? "U").charAt(0).toUpperCase()}</span>
-                  )}
-                </div>
-                <span className="header-user-name">{userName ?? "Profile"}</span>
-              </button>
-              <button className="logout-button" onClick={handleLogout}>
-                Logout
-              </button>
-            </>
-          ) : (
-            <button className="logout-button" onClick={() => handleNavigate("login")} style={{ background: "#008080" }}>
-              Login
-            </button>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-
   return (
     <div className="app-container">
       {view === "home" && (
         <HomePage onNavigate={(p) => handleNavigate(p as AppView)} token={token} />
       )}
       {view === "login" && (
-          <Login 
-            onLogin={handleLogin} 
-            onBackToHome={() => setView("stall-picker")} 
-          />
+        <Login
+          onLogin={handleLogin}
+          onNavigate={handleNavigate}
+          onBackToHome={() => setView("home")}
+        />
       )}
 
 
       {view === "stall-picker" && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <StallPicker token={token ?? undefined} onSelectStall={handleSelectStall} />
           </main>
@@ -205,7 +145,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "menu" && selectedStallId && selectedStallName && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <Menu
               token={token ?? undefined}
@@ -220,7 +160,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "admin" && token && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <AdminDashboard token={token} />
           </main>
@@ -229,7 +169,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "vendor" && token && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <VendorDashboard token={token} />
           </main>
@@ -238,7 +178,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "profile" && token && userId && role && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <Profile token={token} userId={userId} role={role} onBack={handleBackToPrevious} onProfileUpdate={handleProfileUpdate} />
           </main>
@@ -247,7 +187,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "orders" && token && userId && role && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <OrdersList token={token} userId={userId} role={role} onBack={handleBackToPrevious} />
           </main>
@@ -256,7 +196,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "about" && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <AboutUs />
           </main>
@@ -265,7 +205,7 @@ const [view, setView] = useState<AppView>("home");
 
       {view === "trends" && (
         <div className="app-with-header">
-          {appHeader}
+          <Header onNavigate={handleNavigate} token={token} />
           <main className="app-main">
             <Trends token={token ?? undefined} onBack={handleBackToPrevious} />
           </main>

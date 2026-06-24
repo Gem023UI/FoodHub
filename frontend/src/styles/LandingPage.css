@@ -8,19 +8,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@800;900&display=swap');
 
 /* ── Reset inside landing ── */
-.landing-page *,
-.landing-page *::before,
-.landing-page *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
 
 .landing-page {
   font-family: 'Poppins', sans-serif;
   background: #fafaf8;
   color: #1a1a1a;
   overflow-x: hidden;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 /* ════════════════════════════════
@@ -33,7 +29,7 @@
   justify-content: center;
   gap: 60px;
   padding: 64px 80px 80px;
-  min-height: 480px;
+  max-height: 500px;
   position: relative;
   overflow: hidden;
 }

@@ -88,8 +88,8 @@ authRouter.post("/register", async (request, response) => {
       emailVerificationExpires: expiresAt,
     });
 
-    // TODO: Send email via your mail transport (nodemailer / SendGrid / etc.)
-    // await sendVerificationEmail(email, verificationCode);
+    const { sendVerificationEmail } = require("../utils/mailer");
+    await sendVerificationEmail(email, verificationCode);
 
     response.status(201).json({
       message: "Registration successful. Please check your email to verify your account.",

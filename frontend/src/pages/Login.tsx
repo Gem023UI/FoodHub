@@ -164,15 +164,14 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
       // Upload proof of legitimacy to Cloudinary for vendors
       if (registerRole === "vendor" && proofFile) {
         const formData = new FormData();
-        formData.append("file", proofFile);
-        formData.append("upload_preset", "foodhub_unsigned"); // adjust preset name
-        const uploadRes = await fetch("https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload", {
+        formData.append("proof", proofFile);
+        const uploadRes = await fetch("/api/users/vendor-proof-upload", {
           method: "POST",
           body: formData,
         });
         if (!uploadRes.ok) throw new Error("Failed to upload proof of legitimacy.");
-        const uploadData = await uploadRes.json() as { secure_url: string };
-        profilePictureUrl = uploadData.secure_url;
+        const uploadData = await uploadRes.json() as { url: string };
+        profilePictureUrl = uploadData.url;
       }
 
       const body = registerRole === "student"

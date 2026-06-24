@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import tupLogo from "../../images/Logo.png";
-import "../styles/header.css";
+import "../styles/Header.css";
 
 interface HeaderProps {
   onNavigate: (page: string) => void;
