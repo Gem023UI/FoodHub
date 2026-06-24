@@ -1,0 +1,135 @@
+/* ═══════════════════════════════════════════════
+   FOODHUB HEADER / NAV STYLES
+   ═══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@800;900&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+
+/* ════════════════════════════════
+   NAV BAR
+   ════════════════════════════════ */
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffde59;
+  padding: 0 40px;
+  height: 64px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Brand (left) */
+.lp-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.lp-nav-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.lp-nav-brand-text {
+  font-family: 'Plus Jakarta Sans', 'Google Sans Flex', sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  color: #ff3131;
+  letter-spacing: -0.5px;
+}
+
+/* Center links */
+.lp-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.lp-nav-link {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 20px;
+  transition: background 0.18s, color 0.18s;
+}
+
+.lp-nav-link:hover,
+.lp-nav-link.active {
+  background: #ff3131;
+  color: #fff;
+}
+
+/* Right icons */
+.lp-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.lp-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1a1a1a;
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s, color 0.18s;
+}
+
+.lp-icon-btn:hover {
+  background: rgba(255, 49, 49, 0.12);
+  color: #ff3131;
+}
+
+.lp-login-btn {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  background: #ff3131;
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  padding: 8px 22px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s;
+}
+
+.lp-login-btn:hover {
+  background: #cc0000;
+  transform: scale(1.03);
+}
+
+/* ════════════════════════════════
+   RESPONSIVE NAV
+   ════════════════════════════════ */
+@media (max-width: 900px) {
+  .lp-nav {
+    padding: 0 20px;
+  }
+
+  .lp-nav-links {
+    display: none;
+  }
+}

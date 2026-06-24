@@ -1,0 +1,457 @@
+/* ═══════════════════════════════════════════════
+   FOODHUB LOGIN / REGISTER PAGE STYLES
+   Matches LandingPage palette and typography
+   ═══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@800;900&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+
+/* ════════════════════════════════
+   PAGE WRAPPER — full viewport with BG image
+   ════════════════════════════════ */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Poppins', sans-serif;
+  background: url('/images/background.png') center center / cover no-repeat fixed;
+  position: relative;
+}
+
+/* Dark overlay so the card stays readable */
+.auth-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 26, 0.55);
+  z-index: 0;
+}
+
+/* Ensure nav and content sit above the overlay */
+.auth-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ════════════════════════════════
+   CONTENT AREA (centred card)
+   ════════════════════════════════ */
+.auth-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+
+/* ════════════════════════════════
+   CARD
+   ════════════════════════════════ */
+.auth-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 24px;
+  padding: 44px 40px 36px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* Brand block inside card */
+.auth-card-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.auth-card-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.auth-card-brand-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 900;
+  font-size: 26px;
+  color: #ff3131;
+  letter-spacing: -0.5px;
+}
+
+/* Title */
+.auth-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 900;
+  font-size: 22px;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  color: #a6a6a6;
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+/* ════════════════════════════════
+   TAB SWITCHER (Login / Register)
+   ════════════════════════════════ */
+.auth-tabs {
+  display: flex;
+  background: #f3f3f1;
+  border-radius: 14px;
+  padding: 4px;
+  width: 100%;
+  margin-bottom: 26px;
+}
+
+.auth-tab {
+  flex: 1;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #a6a6a6;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 0;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+.auth-tab.active {
+  background: #ff3131;
+  color: #fff;
+}
+
+/* ════════════════════════════════
+   ROLE SELECTOR (Student / Vendor)
+   ════════════════════════════════ */
+.auth-role-selector {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.auth-role-btn {
+  flex: 1;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  border: 2px solid #e8e8e4;
+  border-radius: 12px;
+  padding: 11px 8px;
+  background: #fafaf8;
+  color: #a6a6a6;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+
+.auth-role-btn i {
+  font-size: 20px;
+}
+
+.auth-role-btn.selected {
+  border-color: #ff3131;
+  background: #fff5f5;
+  color: #ff3131;
+}
+
+/* ════════════════════════════════
+   FORM
+   ════════════════════════════════ */
+.auth-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.auth-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  letter-spacing: 0.3px;
+}
+
+/* Input wrapper (for icon + input + eye toggle) */
+.auth-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-wrap .field-icon {
+  position: absolute;
+  left: 13px;
+  color: #a6a6a6;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.auth-input-wrap input,
+.auth-input-wrap select {
+  width: 100%;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  padding: 11px 38px 11px 36px;
+  border: 1.5px solid #e8e8e4;
+  border-radius: 12px;
+  background: #fafaf8;
+  color: #1a1a1a;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  appearance: none;
+}
+
+.auth-input-wrap input:focus,
+.auth-input-wrap select:focus {
+  border-color: #ff3131;
+  box-shadow: 0 0 0 3px rgba(255, 49, 49, 0.10);
+}
+
+.auth-input-wrap input::placeholder {
+  color: #c4c4be;
+}
+
+.auth-input-wrap input:disabled,
+.auth-input-wrap select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Eye toggle */
+.auth-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #a6a6a6;
+  font-size: 14px;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.auth-eye-btn:hover {
+  color: #ff3131;
+}
+
+/* File upload */
+.auth-file-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1.5px dashed #e8e8e4;
+  border-radius: 12px;
+  background: #fafaf8;
+  cursor: pointer;
+  font-size: 13px;
+  color: #a6a6a6;
+  transition: border-color 0.18s;
+}
+
+.auth-file-label:hover {
+  border-color: #ff3131;
+  color: #ff3131;
+}
+
+.auth-file-label input[type="file"] {
+  display: none;
+}
+
+.auth-file-name {
+  font-size: 12px;
+  color: #555;
+  margin-top: 4px;
+  margin-left: 2px;
+}
+
+/* ════════════════════════════════
+   SECTION DIVIDER LABEL
+   ════════════════════════════════ */
+.auth-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a6a6a6;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+
+.auth-section-label::before,
+.auth-section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e8e8e4;
+}
+
+/* ════════════════════════════════
+   ALERTS
+   ════════════════════════════════ */
+.auth-alert {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.auth-alert.error {
+  background: #fff2f2;
+  border: 1px solid #ffc9c9;
+  color: #cc0000;
+}
+
+.auth-alert.success {
+  background: #f0faf0;
+  border: 1px solid #b2e5b2;
+  color: #2d7a2d;
+}
+
+/* Verification code notice */
+.auth-verify-notice {
+  width: 100%;
+  background: #fffbea;
+  border: 1px solid #ffe066;
+  border-radius: 12px;
+  padding: 16px 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-verify-notice i {
+  font-size: 28px;
+  color: #ffde59;
+}
+
+.auth-verify-notice p {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.auth-verify-notice strong {
+  color: #1a1a1a;
+}
+
+/* ════════════════════════════════
+   SUBMIT BUTTON
+   ════════════════════════════════ */
+.auth-submit-btn {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  background: #ff3131;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 13px;
+  width: 100%;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s, box-shadow 0.18s;
+  box-shadow: 0 4px 16px rgba(255, 49, 49, 0.25);
+  margin-top: 4px;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  background: #cc0000;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 49, 49, 0.30);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ════════════════════════════════
+   FOOTER LINKS
+   ════════════════════════════════ */
+.auth-footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  width: 100%;
+}
+
+.auth-text-btn {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff3131;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+
+.auth-text-btn:hover { opacity: 0.7; }
+
+.auth-text-btn.guest {
+  color: #a6a6a6;
+  font-weight: 500;
+}
+
+.auth-text-btn.guest:hover { color: #1a1a1a; }
+
+.auth-support {
+  font-size: 11px;
+  color: #c4c4be;
+  margin-top: 6px;
+}
+
+/* ════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════ */
+@media (max-width: 520px) {
+  .auth-card {
+    padding: 32px 20px 28px;
+    border-radius: 18px;
+  }
+
+  .auth-field-row {
+    grid-template-columns: 1fr;
+  }
+}

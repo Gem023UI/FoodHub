@@ -1,6 +1,6 @@
 import { type NextFunction, type Request, type Response } from "express";
-import { getConfig } from "../config/env";
-import { verifyAccessToken } from "../utils/jwt";
+import { getConfig } from "../env";
+import { verifyAccessToken } from "../../utils/jwt";
 
 export function authenticateRequest(request: Request, response: Response, next: NextFunction): void {
   const authorizationHeader = request.header("authorization");

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Header } from "../components/Header";
 import tupLogo from "../../images/Logo.png";
 import ricemeal from "../../images/foods/ricemeal.png";
 import snacks from "../../images/foods/snacks.png";
@@ -16,8 +17,12 @@ import pizza from "../../images/foods/pizza.png";
 import sandwich from "../../images/foods/sandwich.png";
 import soda from "../../images/foods/soda.png";
 import soda1 from "../../images/foods/soda1.png";
+import "../styles/LandingPage.css";
 
-const heroImages = [ricemeal, snacks, beverage, burger, crispybite, donut, egg, fries, juice, lemonade, lemonade1, matcha, pizza, sandwich, soda, soda1];
+const heroImages = [
+  ricemeal, snacks, beverage, burger, crispybite, donut,
+  egg, fries, juice, lemonade, lemonade1, matcha, pizza, sandwich, soda, soda1,
+];
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
@@ -25,10 +30,6 @@ interface HomePageProps {
 }
 
 export function HomePage({ onNavigate, token }: HomePageProps) {
-
-  const heroImages = [ricemeal, snacks, beverage, burger, crispybite, donut, egg, fries, juice, lemonade, lemonade1, matcha, pizza, sandwich, soda, soda1];
-
-
   const [currentSlide, setCurrentSlide] = useState(0);
   const [animating, setAnimating] = useState(false);
 
@@ -41,41 +42,12 @@ export function HomePage({ onNavigate, token }: HomePageProps) {
       }, 600);
     }, 2000);
     return () => clearInterval(interval);
-  }, [heroImages.length]);
+  }, []);
+
   return (
     <div className="landing-page">
-      {/* ─── NAVBAR ─── */}
-      <nav className="lp-nav">
-        {/* Left: Logo + Brand */}
-        <div className="lp-nav-brand" onClick={() => onNavigate("home")} style={{ cursor: "pointer" }}>
-          <img src={tupLogo} alt="FoodHub Logo" className="lp-nav-logo" />
-          <span className="lp-nav-brand-text">FoodHub</span>
-        </div>
-
-        {/* Center: Nav Links */}
-        <ul className="lp-nav-links">
-          <li><button onClick={() => onNavigate("home")} className="lp-nav-link active">Home</button></li>
-          <li><button onClick={() => onNavigate("trends")} className="lp-nav-link">Trends</button></li>
-          <li><button onClick={() => onNavigate("stalls")} className="lp-nav-link">Stalls</button></li>
-          <li><button onClick={() => onNavigate("about")} className="lp-nav-link">About</button></li>
-        </ul>
-
-        {/* Right: Icons + Login */}
-        <div className="lp-nav-right">
-          <button className="lp-icon-btn" title="Search" aria-label="Search">
-            <i className="fas fa-search"></i>
-          </button>
-          <button className="lp-icon-btn" title="Profile" aria-label="Profile" onClick={() => onNavigate("profile")}>
-            <i className="fas fa-user-circle"></i>
-          </button>
-          <button
-            className="lp-login-btn"
-            onClick={() => onNavigate(token ? "profile" : "login")}
-          >
-            {token ? "My Account" : "Login"}
-          </button>
-        </div>
-      </nav>
+      {/* ─── HEADER (extracted component) ─── */}
+      <Header onNavigate={onNavigate} token={token} />
 
       {/* ─── HERO ─── */}
       <section className="lp-hero">
@@ -98,7 +70,7 @@ export function HomePage({ onNavigate, token }: HomePageProps) {
             Discover the best canteen stalls at TUP. Pre-order your meals
             and skip the queue — fresh food, faster.
           </p>
-          <button className="lp-hero-btn" onClick={() => onNavigate("stalls")}>
+          <button className="lp-hero-btn" onClick={() => onNavigate("#lp-categories")}>
             Explore Now
           </button>
         </div>
@@ -144,7 +116,10 @@ export function HomePage({ onNavigate, token }: HomePageProps) {
                 <p className="lp-stall-tag">{stall.tag}</p>
                 <div className="lp-stall-footer">
                   <span className="lp-stall-price">{stall.price} avg.</span>
-                  <button className="lp-stall-order-btn" onClick={(e) => { e.stopPropagation(); onNavigate("stalls"); }}>
+                  <button
+                    className="lp-stall-order-btn"
+                    onClick={(e) => { e.stopPropagation(); onNavigate("stalls"); }}
+                  >
                     Order
                   </button>
                 </div>
@@ -156,7 +131,6 @@ export function HomePage({ onNavigate, token }: HomePageProps) {
 
       {/* ─── HOW IT WORKS + PROMO ─── */}
       <section className="lp-bottom-row">
-        {/* How It Works */}
         <div className="lp-how-card">
           <h2 className="lp-how-title">Order Food The Smart Way.</h2>
           <img src={tupLogo} alt="Delivery" className="lp-how-img" />
@@ -178,8 +152,6 @@ export function HomePage({ onNavigate, token }: HomePageProps) {
           </ul>
           <button className="lp-how-btn" onClick={() => onNavigate("stalls")}>Get Started</button>
         </div>
-
-        {/* Promo Card */}
         <div className="lp-promo-card">
           <img src={tupLogo} alt="Promo" className="lp-promo-img" />
           <h3 className="lp-promo-title">Today's Special</h3>

@@ -1,3 +1,64 @@
+// ── Auth registration ────────────────────────────────────────────────────────
+
+export interface StudentRegisterInput {
+  firstName: string;
+  lastName: string;
+  birthday: string;          // ISO date string
+  email: string;
+  tuptId: string;            // TUPT-XX-XXXX
+  course: string;
+  section: string;
+  contactNumber: string;
+  password: string;
+  role: "student";
+}
+
+export interface VendorRegisterInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  contactNumber: string;
+  proofOfLegitimacyUrl?: string;  // Cloudinary URL
+  role: "vendor";
+}
+
+export async function registerStudent(input: StudentRegisterInput): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Registration failed");
+  }
+}
+
+export async function registerVendor(input: VendorRegisterInput): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Registration failed");
+  }
+}
+
+export async function verifyEmail(email: string, code: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Verification failed");
+  }
+}
+
 export interface StallSummary {
   _id: string;
   name: string;
@@ -12,8 +73,6 @@ export interface StallSummary {
     email: string;
   } | string;
 }
-
-
 
 export interface MenuItemSummary {
   _id: string;
@@ -34,86 +93,42 @@ export interface MenuItemSummary {
   photoUrl?: string | null;
 }
 
-
-
 export interface ReviewSummary {
-
   averageRating: number;
-
   reviewCount: number;
-
 }
-
-
 
 export interface StallsResponse {
-
   stalls: StallSummary[];
-
 }
-
-
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
-
-
 async function request<T>(path: string, token?: string): Promise<T> {
-
   const headers: Record<string, string> = {};
-
   if (token) {
-
     headers["Authorization"] = `Bearer ${token}`;
-
   }
-
-
-
   const response = await fetch(`${apiBaseUrl}${path}`, { headers });
-
-
-
   if (!response.ok) {
-
     throw new Error(`Request failed with status ${response.status}`);
-
   }
-
-
-
   return response.json() as Promise<T>;
-
 }
-
-
 
 export async function fetchStalls(token?: string): Promise<StallSummary[]> {
-
   const result = await request<StallsResponse>("/stalls", token);
-
   return result.stalls;
-
 }
 
-
-
 export async function fetchStallDetails(
-
   stallId: string,
-
   token?: string
-
 ): Promise<{
-
   stall: StallSummary;
-
   menuItems: MenuItemSummary[];
-
   reviewSummary: ReviewSummary;
-
 }> {
-
   return request(`/stalls/${stallId}`, token);
 }
 

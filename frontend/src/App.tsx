@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
-import { Login } from "./components/Login";
-import { StallPicker } from "./components/StallPicker";
+import { Login } from "./pages/Login";
+import { StallPicker } from "./pages/StallPicker";
 import { Menu } from "./components/Menu";
-import { HomePage } from "./components/LandingPage";
-import { AdminDashboard } from "./components/AdminDashboard";
-import { VendorDashboard } from "./components/VendorDashboard";
-import { Profile } from "./components/Profile";
-import { AboutUs } from "./components/AboutUs";
-import Trends from "./components/Trends";
-import { OrdersList } from "./components/OrdersList";
+import { HomePage } from "./pages/LandingPage";
+import { AdminDashboard } from "./pages/AdminDashboard";
+import { VendorDashboard } from "./pages/VendorDashboard";
+import { Profile } from "./pages/Profile";
+import { AboutUs } from "./pages/AboutUs";
+import Trends from "./pages/Trends";
+import { OrdersList } from "./pages/OrdersList";
 
 import "./styles/LandingPage.css";
 

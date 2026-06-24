@@ -2,31 +2,64 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserModel = void 0;
 const mongoose_1 = require("mongoose");
-const userSchema = new mongoose_1.Schema({
-    name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },
-    email: { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
+
+const userSchema = new mongoose_1.Schema(
+  {
+    // ── Shared basic fields ──────────────────────────
+    firstName: { type: String, required: true, trim: true, maxlength: 50 },
+    lastName:  { type: String, required: true, trim: true, maxlength: 50 },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      index: true,
+    },
     passwordHash: { type: String, required: true, select: false },
+
     role: {
-        type: String,
-        required: true,
-        enum: ["user", "vendor", "admin"],
-        default: "user"
+      type: String,
+      required: true,
+      enum: ["student", "vendor", "admin"],
+      default: "student",
     },
+
     profilePictureUrl: { type: String, trim: true, default: null },
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: false }, // activated after email verify
+
+    // ── Verification / status ────────────────────────
     status: {
-        type: String,
-        enum: ["Active", "Suspended", "Pending"],
-        default: "Active"
+      type: String,
+      enum: ["unverified", "verified", "suspended"],
+      default: "unverified",
     },
-    // Student-specific fields
-    studentId: { type: String, trim: true, default: null },
-    courseSection: { type: String, trim: true, default: null },
-    schoolEmail: { type: String, trim: true, lowercase: true, default: null, sparse: true },
-    // Vendor-specific fields
-    contactNumber: { type: String, trim: true, default: null }
-}, { timestamps: true });
+    emailVerificationCode:       { type: String, select: false, default: null },
+    emailVerificationExpires:    { type: Date,   select: false, default: null },
+
+    // ── Student-specific fields ──────────────────────
+    birthday:      { type: Date,   default: null },
+    tuptId: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+      sparse: true,
+      // unique enforced via index below
+    },
+    course:        { type: String, trim: true, default: null },
+    section:       { type: String, trim: true, default: null },
+    contactNumber: { type: String, trim: true, default: null },
+
+    // ── Vendor-specific fields ───────────────────────
+    proofOfLegitimacyUrl: { type: String, trim: true, default: null },
+  },
+  { timestamps: true }
+);
+
+// ── Indexes ─────────────────────────────────────────
 userSchema.index({ role: 1, isActive: 1 });
-userSchema.index({ studentId: 1 }, { sparse: true });
+userSchema.index({ tuptId: 1 }, { unique: true, sparse: true });
 userSchema.index({ contactNumber: 1 }, { sparse: true });
+
 exports.UserModel = (0, mongoose_1.model)("User", userSchema);
