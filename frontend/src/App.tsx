@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Login } from "./components/Login";
 import { StallPicker } from "./components/StallPicker";
 import { Menu } from "./components/Menu";
+import { HomePage } from "./components/LandingPage";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { VendorDashboard } from "./components/VendorDashboard";
 import { Profile } from "./components/Profile";
@@ -9,10 +10,12 @@ import { AboutUs } from "./components/AboutUs";
 import Trends from "./components/Trends";
 import { OrdersList } from "./components/OrdersList";
 
-type AppView = "login" | "stall-picker" | "menu" | "admin" | "vendor" | "profile" | "about" | "trends" | "orders";
+import "./styles/LandingPage.css";
+
+type AppView = "home" | "login" | "stall-picker" | "menu" | "admin" | "vendor" | "profile" | "about" | "trends" | "orders";
 
 function App() {
-  const [view, setView] = useState<AppView>("stall-picker");
+const [view, setView] = useState<AppView>("home");
   const [token, setToken] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -41,7 +44,7 @@ function App() {
       } else if (storedRole === "vendor") {
         setView("vendor");
       } else {
-        setView("stall-picker");
+        setView("home");
       }
     }
   }, []);
@@ -62,7 +65,7 @@ function App() {
     } else if (newRole === "vendor") {
       setView("vendor");
     } else {
-      setView("stall-picker");
+      setView("home");
     }
   };
 
@@ -103,9 +106,13 @@ function App() {
     }
   };
 
-  const handleNavigate = (newView: AppView) => {
+  const handleNavigate = (newView: string) => {
     setPreviousView(view);
-    setView(newView);
+    if (newView === "stalls") {
+      setView("stall-picker");
+    } else {
+      setView(newView as AppView);
+    }
   };
 
   const handleBackToPrevious = () => {
@@ -176,6 +183,9 @@ function App() {
 
   return (
     <div className="app-container">
+      {view === "home" && (
+        <HomePage onNavigate={(p) => handleNavigate(p as AppView)} token={token} />
+      )}
       {view === "login" && (
           <Login 
             onLogin={handleLogin} 

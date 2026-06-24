@@ -13,8 +13,6 @@ var stall_model_1 = require("./stall.model");
 Object.defineProperty(exports, "StallModel", { enumerable: true, get: function () { return stall_model_1.StallModel; } });
 var user_model_1 = require("./user.model");
 Object.defineProperty(exports, "UserModel", { enumerable: true, get: function () { return user_model_1.UserModel; } });
-var category_model_1 = require("./category.model");
-Object.defineProperty(exports, "CategoryModel", { enumerable: true, get: function () { return category_model_1.CategoryModel; } });
 var order_model_1 = require("./order.model");
 Object.defineProperty(exports, "OrderModel", { enumerable: true, get: function () { return order_model_1.OrderModel; } });
 var report_model_1 = require("./report.model");

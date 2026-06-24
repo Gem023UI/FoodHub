@@ -2,12 +2,12 @@
   "name": "foodhub",
   "version": "1.0.0",
   "description": "FoodHub backend API for canteen stalls, menus, and reviews.",
-  "main": "dist/server.js",
+  "main": "server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "dev:frontend": "npm run dev --prefix frontend",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "start": "node server.js",
     "test": "jest",
     "seed": "node scripts/seed.js",
     "list-dbs": "node scripts/list_dbs.js"
