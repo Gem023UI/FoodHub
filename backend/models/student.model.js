@@ -1,4 +1,5 @@
 "use strict";
+
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudentModel = void 0;
 const mongoose_1 = require("mongoose");
@@ -7,14 +8,24 @@ const studentSchema = new mongoose_1.Schema(
   {
     firstName:    { type: String, required: true, trim: true, maxlength: 50 },
     lastName:     { type: String, required: true, trim: true, maxlength: 50 },
-    email:        { type: String, required: true, trim: true, lowercase: true, unique: true, index: true },
+    email:        { 
+      type: String, 
+      required: true, 
+      trim: true, 
+      lowercase: true, 
+      unique: true,
+    },
     passwordHash: { type: String, required: true, select: false },
     role:         { type: String, default: "student", immutable: true },
 
     birthday:      { type: Date,   default: null },
     tuptId: {
-      type: String, trim: true, uppercase: true,
-      unique: true, sparse: true, default: null,
+      type: String, 
+      trim: true, 
+      uppercase: true,
+      unique: true,
+      sparse: true, 
+      default: null,
     },
     course:        { type: String, trim: true, default: null },
     section:       { type: String, trim: true, default: null },
@@ -29,11 +40,9 @@ const studentSchema = new mongoose_1.Schema(
     },
     emailVerificationCode:    { type: String, select: false, default: null },
     emailVerificationExpires: { type: Date,   select: false, default: null },
+    lastVerificationSentAt:   { type: Date,   select: false, default: null },
   },
   { timestamps: true, collection: "students" }
 );
-
-studentSchema.index({ tuptId: 1 }, { unique: true, sparse: true });
-studentSchema.index({ status: 1, isActive: 1 });
 
 exports.StudentModel = (0, mongoose_1.model)("Student", studentSchema);

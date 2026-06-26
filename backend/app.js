@@ -1,9 +1,12 @@
 "use strict";
+
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createApp = createApp;
+
 const express_1 = __importDefault(require("express"));
 const auth_routes_1 = require("./routes/auth.routes");
 const favorites_routes_1 = require("./routes/favorites.routes");
@@ -23,6 +26,13 @@ function createApp() {
     app.use("/analytics", analytics_routes_1.analyticsRouter);
     app.get("/health", (_request, response) => {
         response.json({ status: "ok", service: "FoodHub API" });
+    });
+    app.use((err, req, res, next) => {
+        console.error("Unhandled error:", err);
+        res.status(500).json({ 
+            message: "Internal server error", 
+            error: process.env.NODE_ENV === "development" ? err.message : undefined 
+        });
     });
     return app;
 }

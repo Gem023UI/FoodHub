@@ -1,5 +1,7 @@
 // ── Auth registration ────────────────────────────────────────────────────────
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
 export interface StudentRegisterInput {
   firstName: string;
   lastName: string;
@@ -102,8 +104,6 @@ export interface StallsResponse {
   stalls: StallSummary[];
 }
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-
 async function request<T>(path: string, token?: string): Promise<T> {
   const headers: Record<string, string> = {};
   if (token) {
@@ -176,7 +176,7 @@ export async function placePreOrder(
   }
 ): Promise<{ order: OrderSummary }> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const response = await fetch(`${apiBaseUrl}/orders`, {
+  const response = await fetch(`${apiBaseUrl}/api/orders`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -193,7 +193,7 @@ export async function placePreOrder(
 
 export async function fetchStudentOrders(token: string): Promise<OrderSummary[]> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const response = await fetch(`${apiBaseUrl}/orders/student`, {
+  const response = await fetch(`${apiBaseUrl}/api/orders/student`, {
     headers: { "Authorization": `Bearer ${token}` }
   });
   if (!response.ok) {
@@ -205,7 +205,7 @@ export async function fetchStudentOrders(token: string): Promise<OrderSummary[]>
 
 export async function fetchVendorOrders(token: string): Promise<OrderSummary[]> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const response = await fetch(`${apiBaseUrl}/orders/vendor`, {
+  const response = await fetch(`${apiBaseUrl}/api/orders/vendor`, {
     headers: { "Authorization": `Bearer ${token}` }
   });
   if (!response.ok) {
@@ -224,7 +224,7 @@ export async function updateOrderStatusAPI(
   }
 ): Promise<{ order: OrderSummary }> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const response = await fetch(`${apiBaseUrl}/orders/${orderId}`, {
+  const response = await fetch(`${apiBaseUrl}/api/orders/${orderId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -281,7 +281,7 @@ export async function submitReport(
   }
 ): Promise<{ report: ReportSummary }> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const response = await fetch(`${apiBaseUrl}/reports`, {
+  const response = await fetch(`${apiBaseUrl}/api/reports`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -298,7 +298,7 @@ export async function submitReport(
 
 export async function fetchReports(token: string, status?: string): Promise<ReportSummary[]> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const url = status ? `${apiBaseUrl}/reports?status=${status}` : `${apiBaseUrl}/reports`;
+  const url = status ? `${apiBaseUrl}/api/reports?status=${status}` : `${apiBaseUrl}/api/reports`;
   const response = await fetch(url, {
     headers: { "Authorization": `Bearer ${token}` }
   });
@@ -319,7 +319,7 @@ export async function updateReport(
   }
 ): Promise<{ report: ReportSummary }> {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-  const response = await fetch(`${apiBaseUrl}/reports/${reportId}`, {
+  const response = await fetch(`${apiBaseUrl}/api/reports/${reportId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

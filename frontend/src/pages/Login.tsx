@@ -72,33 +72,12 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
 
   // ── email verification ──
   const [verifyState, setVerifyState] = useState<VerifyState>("idle");
-  const [verifyCode, setVerifyCode] = useState("");
   const [verifyInput, setVerifyInput] = useState("");
-
-  function resetForms() {
-    setEmail("");
-    setPassword("");
-    setShowPassword(false);
-    setFirstName("");
-    setLastName("");
-    setBirthday("");
-    setTuptId("");
-    setCourse("");
-    setSection("");
-    setContactNumber("");
-    setVFirstName("");
-    setVLastName("");
-    setVContactNumber("");
-    setProofFile(null);
-    setError(null);
-    setSuccessMsg(null);
-    setVerifyState("idle");
-    setVerifyCode("");
-    setVerifyInput("");
-  }
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
 
   function switchMode(m: AuthMode) {
-    resetForms();
+    // resetForms();
     setMode(m);
   }
 
@@ -206,10 +185,19 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
       const data = await response.json() as { message?: string };
       if (!response.ok) throw new Error(data.message ?? "Registration failed");
 
-      // Simulate OTP generation (replace with real code from backend response)
-      const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setVerifyCode(mockCode);
+      // ⭐ REMOVE the mock code generation - the backend handles this
+      // The actual code is sent via email and stored in the database
+      
+      // ⭐ Instead, we just set the state to pending
       setVerifyState("pending");
+      setSuccessMsg("Verification code sent to your email! Please check your inbox.");
+      setError(null);
+      
+      // ⭐ In development, log where to find the code
+      if (import.meta.env.DEV) {
+        console.log("📧 [DEV] Check your email for the verification code.");
+        console.log("📧 [DEV] Also check the backend console for the code.");
+      }
     } catch (err) {
       setError(err instanceof TypeError ? getNetworkError() : (err instanceof Error ? err.message : "Registration failed"));
     } finally {
@@ -221,29 +209,168 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (verifyInput.trim() !== verifyCode) {
-      setError("Incorrect verification code. Please check your email and try again.");
-      return;
-    }
     setIsLoading(true);
+    
     try {
-      // Call backend to mark email as verified
+      // ⭐ Send the code to the backend for verification
+      // The backend will compare it against the stored code
       const response = await fetch("/api/auth/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: verifyInput.trim() }),
+        body: JSON.stringify({ 
+          email: email, 
+          code: verifyInput.trim() 
+        }),
       });
+      
       const data = await response.json() as { message?: string };
-      if (!response.ok) throw new Error(data.message ?? "Verification failed");
+      
+      if (!response.ok) {
+        throw new Error(data.message ?? "Verification failed");
+      }
+      
       setVerifyState("verified");
       setSuccessMsg("Email verified! Your account is now active. Please log in.");
-      setTimeout(() => switchMode("login"), 2000);
+      setError(null);
+      
+      // Switch to login after 2 seconds
+      setTimeout(() => {
+        switchMode("login");
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setIsLoading(false);
     }
   }
+
+  // ── RESEND VERIFICATION CODE ──
+  async function handleResendVerification() {
+    if (resendCooldown > 0 || isResending) return;
+    
+    setError(null);
+    setIsResending(true);
+    
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json() as { 
+        message?: string;
+        remainingSeconds?: number;
+        codeSent?: boolean;
+      };
+      
+      if (!response.ok) {
+        if (response.status === 429 && data.remainingSeconds) {
+          setResendCooldown(data.remainingSeconds);
+          // Start countdown
+          const interval = setInterval(() => {
+            setResendCooldown((prev) => {
+              if (prev <= 1) {
+                clearInterval(interval);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+          throw new Error(data.message || "Please wait before requesting a new code.");
+        }
+        throw new Error(data.message || "Failed to resend verification code.");
+      }
+      
+      setSuccessMsg("New verification code sent to your email!");
+      setError(null);
+      
+      // Start 60-second cooldown
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      // Log for development
+      if (import.meta.env.DEV) {
+        console.log("📧 [DEV] New verification code sent. Check your email or backend console.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend verification code.");
+    } finally {
+      setIsResending(false);
+    }
+  }
+
+  {/* ── EMAIL VERIFICATION ── */}
+  {mode === "register" && verifyState === "pending" && (
+    <form className="auth-form" onSubmit={handleVerify}>
+      <div className="auth-verify-notice">
+        <i className="fas fa-envelope-open-text"></i>
+        <p>
+          A 6-digit verification code has been sent to{" "}
+          <strong>{email}</strong>. Enter it below to activate your account.
+        </p>
+      </div>
+
+      <div className="auth-field">
+        <label>Verification code</label>
+        <div className="auth-input-wrap">
+          <i className="fas fa-key field-icon"></i>
+          <input
+            type="text"
+            placeholder="Enter 6-digit code"
+            value={verifyInput}
+            onChange={(e) => setVerifyInput(e.target.value.replace(/\s/g, ''))}
+            maxLength={6}
+            disabled={isLoading}
+            required
+            autoFocus
+          />
+        </div>
+      </div>
+
+      {/* ⭐ REMOVE the mock code display - it's no longer needed */}
+      {/* The backend handles the verification now */}
+
+      <button type="submit" className="auth-submit-btn" disabled={isLoading}>
+        {isLoading ? "Verifying…" : "Verify Email"}
+      </button>
+
+      {/* Resend button with cooldown */}
+      <div style={{ marginTop: 12, textAlign: "center" }}>
+        <button
+          type="button"
+          onClick={handleResendVerification}
+          disabled={resendCooldown > 0 || isResending}
+          style={{
+            background: "none",
+            border: "none",
+            color: resendCooldown > 0 ? "#a6a6a6" : "#ff3131",
+            cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
+            textDecoration: "underline",
+            fontSize: 14,
+            fontWeight: 500,
+            padding: "8px 16px",
+          }}
+        >
+          {isResending ? (
+            "Sending..."
+          ) : resendCooldown > 0 ? (
+            `Resend code in ${resendCooldown}s`
+          ) : (
+            "Didn't receive the code? Resend"
+          )}
+        </button>
+      </div>
+    </form>
+  )}
 
   const handleNav = onNavigate ?? onBackToHome
     ? (page: string) => {
@@ -689,13 +816,6 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
                   />
                 </div>
               </div>
-
-              {/* DEV ONLY: show mock code for testing. Remove in production. */}
-              {import.meta.env.DEV && (
-                <p style={{ fontSize: 11, color: "#a6a6a6", textAlign: "center" }}>
-                  [DEV] Mock code: <strong>{verifyCode}</strong>
-                </p>
-              )}
 
               <button type="submit" className="auth-submit-btn" disabled={isLoading}>
                 {isLoading ? "Verifying…" : "Verify Email"}

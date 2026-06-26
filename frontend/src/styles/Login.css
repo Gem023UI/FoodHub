@@ -442,6 +442,34 @@
   margin-top: 6px;
 }
 
+.auth-verify-notice {
+    background: #f0f7ff;
+    border: 1px solid #b3d4ff;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.auth-verify-notice i {
+    color: #0066cc;
+    font-size: 20px;
+    margin-top: 2px;
+}
+
+.auth-verify-notice p {
+    color: #1a1a1a;
+    font-size: 14px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.auth-verify-notice strong {
+    color: #ff3131;
+}
+
 /* ════════════════════════════════
    RESPONSIVE
    ════════════════════════════════ */
