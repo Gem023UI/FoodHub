@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
+import { Footer } from "../components/Footer";
+import { loginUser, registerStudent, registerVendor, verifyEmail, resendVerification } from "../lib/api";
+import { getAvailableStalls } from "../lib/api";
 import tupLogo from "../../images/Logo.png";
-import "../styles/login.css";
+import "../styles/Login.css";
 
 // TUP Taguig courses
 const TUP_COURSES = [
@@ -30,17 +33,17 @@ interface LoginProps {
     userId: string,
     role: string,
     name?: string,
-    profilePictureUrl?: string | null
+    profilePictureUrl?: string | null,
+    stallId?: string
   ) => void;
-  onNavigate?: (page: string) => void;
-  onBackToHome?: () => void;
+  onNavigate: (page: string) => void;
 }
 
 type AuthMode = "login" | "register";
 type RegisterRole = "student" | "vendor";
 type VerifyState = "idle" | "pending" | "verified";
 
-export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
+export function Login({ onLogin, onNavigate }: LoginProps) {
   // ── mode ──
   const [mode, setMode] = useState<AuthMode>("login");
   const [registerRole, setRegisterRole] = useState<RegisterRole>("student");
@@ -70,15 +73,44 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
   const [vContactNumber, setVContactNumber] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
 
+  // ── stall fields ──
+  const [stallId, setStallId] = useState("");
+  const [availableStalls, setAvailableStalls] = useState<Array<{_id: string, name: string, location: string}>>([]);
+  const [isLoadingStalls, setIsLoadingStalls] = useState(false);
+
   // ── email verification ──
   const [verifyState, setVerifyState] = useState<VerifyState>("idle");
   const [verifyInput, setVerifyInput] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
+
+  useEffect(() => {
+    if (registerRole === "vendor" && mode === "register" && verifyState === "idle") {
+      fetchAvailableStalls();
+    }
+  }, [registerRole, mode, verifyState]);
+
+  async function fetchAvailableStalls() {
+    setIsLoadingStalls(true);
+    try {
+      const stalls = await getAvailableStalls();
+      setAvailableStalls(stalls);
+    } catch (err) {
+      console.error("Error fetching stalls:", err);
+      setError("Failed to load available stalls. Please refresh and try again.");
+    } finally {
+      setIsLoadingStalls(false);
+    }
+  }
 
   function switchMode(m: AuthMode) {
-    // resetForms();
     setMode(m);
+    setError(null);
+    setSuccessMsg(null);
+    setVerifyState("idle");
+    setVerifyInput("");
+    setStallId("");
   }
 
   function getNetworkError(): string {
@@ -90,30 +122,18 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json() as {
-        accessToken?: string;
-        token?: string;
-        message?: string;
-        user?: {
-          id?: string;
-          _id?: string;
-          role?: string;
-          name?: string;
-          profilePictureUrl?: string | null;
-        };
-      };
-      if (!response.ok) throw new Error(data.message ?? "Login failed");
-      const token = data.accessToken ?? data.token;
-      const userId = data.user?.id ?? data.user?._id;
-      const role = data.user?.role;
-      if (!token || !userId || !role) throw new Error("Invalid response from server");
-      onLogin(token, userId, role, data.user?.name, data.user?.profilePictureUrl);
+      const result = await loginUser(email, password);
+      
+      onLogin(
+        result.accessToken,
+        result.user.id,
+        result.user.role,
+        result.user.name,
+        result.user.profilePictureUrl,
+        result.user.stallId
+      );
     } catch (err) {
       setError(err instanceof TypeError ? getNetworkError() : (err instanceof Error ? err.message : "Login failed"));
     } finally {
@@ -121,7 +141,7 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
     }
   }
 
-  // ── REGISTER — send OTP ──
+  // ── REGISTER ──
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -137,8 +157,15 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
       }
     }
 
+    // Validate vendor stall selection
+    if (registerRole === "vendor" && !stallId) {
+      setError("Please select a stall.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      let profilePictureUrl: string | undefined;
+      let proofOfLegitimacyUrl: string | undefined;
 
       // Upload proof of legitimacy to Cloudinary for vendors
       if (registerRole === "vendor" && proofFile) {
@@ -150,53 +177,40 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
         });
         if (!uploadRes.ok) throw new Error("Failed to upload proof of legitimacy.");
         const uploadData = await uploadRes.json() as { url: string };
-        profilePictureUrl = uploadData.url;
+        proofOfLegitimacyUrl = uploadData.url;
       }
 
-      const body = registerRole === "student"
-        ? {
-            firstName,
-            lastName,
-            birthday,
-            email,
-            tuptId: tuptId.toUpperCase(),
-            course,
-            section,
-            contactNumber,
-            password,
-            role: "student",
-          }
-        : {
-            firstName: vFirstName,
-            lastName: vLastName,
-            email,
-            password,
-            contactNumber: vContactNumber,
-            proofOfLegitimacyUrl: profilePictureUrl,
-            role: "vendor",
-          };
+      if (registerRole === "student") {
+        await registerStudent({
+          firstName,
+          lastName,
+          birthday,
+          email,
+          tuptId: tuptId.toUpperCase(),
+          course,
+          section,
+          contactNumber,
+          password,
+        });
+      } else {
+        await registerVendor({
+          firstName: vFirstName,
+          lastName: vLastName,
+          email,
+          password,
+          contactNumber: vContactNumber,
+          proofOfLegitimacyUrl,
+          stallId,
+        });
+      }
 
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json() as { message?: string };
-      if (!response.ok) throw new Error(data.message ?? "Registration failed");
-
-      // ⭐ REMOVE the mock code generation - the backend handles this
-      // The actual code is sent via email and stored in the database
-      
-      // ⭐ Instead, we just set the state to pending
+      setRegisteredEmail(email);
       setVerifyState("pending");
       setSuccessMsg("Verification code sent to your email! Please check your inbox.");
       setError(null);
       
-      // ⭐ In development, log where to find the code
       if (import.meta.env.DEV) {
         console.log("📧 [DEV] Check your email for the verification code.");
-        console.log("📧 [DEV] Also check the backend console for the code.");
       }
     } catch (err) {
       setError(err instanceof TypeError ? getNetworkError() : (err instanceof Error ? err.message : "Registration failed"));
@@ -212,28 +226,11 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
     setIsLoading(true);
     
     try {
-      // ⭐ Send the code to the backend for verification
-      // The backend will compare it against the stored code
-      const response = await fetch("/api/auth/verify-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email: email, 
-          code: verifyInput.trim() 
-        }),
-      });
-      
-      const data = await response.json() as { message?: string };
-      
-      if (!response.ok) {
-        throw new Error(data.message ?? "Verification failed");
-      }
-      
+      await verifyEmail(registeredEmail, verifyInput.trim());
       setVerifyState("verified");
       setSuccessMsg("Email verified! Your account is now active. Please log in.");
       setError(null);
       
-      // Switch to login after 2 seconds
       setTimeout(() => {
         switchMode("login");
       }, 2000);
@@ -252,40 +249,10 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
     setIsResending(true);
     
     try {
-      const response = await fetch("/api/auth/resend-verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      
-      const data = await response.json() as { 
-        message?: string;
-        remainingSeconds?: number;
-        codeSent?: boolean;
-      };
-      
-      if (!response.ok) {
-        if (response.status === 429 && data.remainingSeconds) {
-          setResendCooldown(data.remainingSeconds);
-          // Start countdown
-          const interval = setInterval(() => {
-            setResendCooldown((prev) => {
-              if (prev <= 1) {
-                clearInterval(interval);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-          throw new Error(data.message || "Please wait before requesting a new code.");
-        }
-        throw new Error(data.message || "Failed to resend verification code.");
-      }
-      
+      const result = await resendVerification(registeredEmail);
       setSuccessMsg("New verification code sent to your email!");
       setError(null);
       
-      // Start 60-second cooldown
       setResendCooldown(60);
       const interval = setInterval(() => {
         setResendCooldown((prev) => {
@@ -297,9 +264,8 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
         });
       }, 1000);
       
-      // Log for development
       if (import.meta.env.DEV) {
-        console.log("📧 [DEV] New verification code sent. Check your email or backend console.");
+        console.log("📧 [DEV] New verification code sent.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to resend verification code.");
@@ -308,85 +274,12 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
     }
   }
 
-  {/* ── EMAIL VERIFICATION ── */}
-  {mode === "register" && verifyState === "pending" && (
-    <form className="auth-form" onSubmit={handleVerify}>
-      <div className="auth-verify-notice">
-        <i className="fas fa-envelope-open-text"></i>
-        <p>
-          A 6-digit verification code has been sent to{" "}
-          <strong>{email}</strong>. Enter it below to activate your account.
-        </p>
-      </div>
-
-      <div className="auth-field">
-        <label>Verification code</label>
-        <div className="auth-input-wrap">
-          <i className="fas fa-key field-icon"></i>
-          <input
-            type="text"
-            placeholder="Enter 6-digit code"
-            value={verifyInput}
-            onChange={(e) => setVerifyInput(e.target.value.replace(/\s/g, ''))}
-            maxLength={6}
-            disabled={isLoading}
-            required
-            autoFocus
-          />
-        </div>
-      </div>
-
-      {/* ⭐ REMOVE the mock code display - it's no longer needed */}
-      {/* The backend handles the verification now */}
-
-      <button type="submit" className="auth-submit-btn" disabled={isLoading}>
-        {isLoading ? "Verifying…" : "Verify Email"}
-      </button>
-
-      {/* Resend button with cooldown */}
-      <div style={{ marginTop: 12, textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={handleResendVerification}
-          disabled={resendCooldown > 0 || isResending}
-          style={{
-            background: "none",
-            border: "none",
-            color: resendCooldown > 0 ? "#a6a6a6" : "#ff3131",
-            cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
-            textDecoration: "underline",
-            fontSize: 14,
-            fontWeight: 500,
-            padding: "8px 16px",
-          }}
-        >
-          {isResending ? (
-            "Sending..."
-          ) : resendCooldown > 0 ? (
-            `Resend code in ${resendCooldown}s`
-          ) : (
-            "Didn't receive the code? Resend"
-          )}
-        </button>
-      </div>
-    </form>
-  )}
-
-  const handleNav = onNavigate ?? onBackToHome
-    ? (page: string) => {
-        if (page === "home" && onBackToHome) onBackToHome();
-        else onNavigate?.(page);
-      }
-    : () => {};
-
   return (
     <div className="auth-page">
-      {/* Shared header */}
-      <Header onNavigate={handleNav} />
+      <Header onNavigate={onNavigate} />
 
       <div className="auth-content">
         <div className="auth-card">
-          {/* Brand */}
           <div className="auth-card-brand">
             <img src={tupLogo} alt="FoodHub" className="auth-card-logo" />
             <span className="auth-card-brand-name">FoodHub</span>
@@ -401,7 +294,6 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
               : "Join FoodHub and start ordering in minutes."}
           </p>
 
-          {/* Login / Register tabs */}
           <div className="auth-tabs">
             <button
               className={`auth-tab ${mode === "login" ? "active" : ""}`}
@@ -417,26 +309,21 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
             </button>
           </div>
 
-          {/* ─── ALERTS ─── */}
           {error && (
-            <div className="auth-alert error" style={{ marginBottom: 14 }}>
+            <div className="auth-alert error">
               <i className="fas fa-circle-exclamation"></i>
               <span>{error}</span>
             </div>
           )}
           {successMsg && (
-            <div className="auth-alert success" style={{ marginBottom: 14 }}>
+            <div className="auth-alert success">
               <i className="fas fa-circle-check"></i>
               <span>{successMsg}</span>
             </div>
           )}
 
-          {/* ══════════════════════════════════
-              LOGIN FORM
-          ══════════════════════════════════ */}
           {mode === "login" && (
             <form className="auth-form" onSubmit={handleLogin}>
-              {/* Email */}
               <div className="auth-field">
                 <label>Email address</label>
                 <div className="auth-input-wrap">
@@ -452,7 +339,6 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
                 </div>
               </div>
 
-              {/* Password */}
               <div className="auth-field">
                 <label>Password</label>
                 <div className="auth-input-wrap">
@@ -482,12 +368,8 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
             </form>
           )}
 
-          {/* ══════════════════════════════════
-              REGISTER FORM
-          ══════════════════════════════════ */}
           {mode === "register" && verifyState === "idle" && (
             <form className="auth-form" onSubmit={handleRegister}>
-              {/* Role selector */}
               <div className="auth-role-selector">
                 <button
                   type="button"
@@ -507,11 +389,9 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
                 </button>
               </div>
 
-              {/* ── STUDENT FIELDS ── */}
               {registerRole === "student" && (
                 <>
                   <div className="auth-section-label">Personal info</div>
-
                   <div className="auth-field-row">
                     <div className="auth-field">
                       <label>First name</label>
@@ -667,7 +547,6 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
                 </>
               )}
 
-              {/* ── VENDOR FIELDS ── */}
               {registerRole === "vendor" && (
                 <>
                   <div className="auth-section-label">Personal info</div>
@@ -741,6 +620,32 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
                     )}
                   </div>
 
+                  <div className="auth-section-label">Stall Assignment</div>
+                  
+                  <div className="auth-field">
+                    <label>Select your stall</label>
+                    <div className="auth-input-wrap">
+                      <i className="fas fa-store field-icon"></i>
+                      <select
+                        value={stallId}
+                        onChange={(e) => setStallId(e.target.value)}
+                        disabled={isLoading || isLoadingStalls}
+                        required
+                      >
+                        <option value="">Select a stall…</option>
+                        {availableStalls.map((stall) => (
+                          <option key={stall._id} value={stall._id}>
+                            {stall.name} - {stall.location}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {isLoadingStalls && <span style={{ fontSize: 12, color: '#666' }}>Loading stalls...</span>}
+                    {availableStalls.length === 0 && !isLoadingStalls && (
+                      <span style={{ fontSize: 12, color: '#ff3131' }}>No stalls available. Please contact admin.</span>
+                    )}
+                  </div>
+
                   <div className="auth-section-label">Contact & access</div>
 
                   <div className="auth-field">
@@ -790,14 +695,13 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
             </form>
           )}
 
-          {/* ── EMAIL VERIFICATION ── */}
           {mode === "register" && verifyState === "pending" && (
             <form className="auth-form" onSubmit={handleVerify}>
               <div className="auth-verify-notice">
                 <i className="fas fa-envelope-open-text"></i>
                 <p>
                   A 6-digit verification code has been sent to{" "}
-                  <strong>{email}</strong>. Enter it below to activate your account.
+                  <strong>{registeredEmail}</strong>. Enter it below to activate your account.
                 </p>
               </div>
 
@@ -809,10 +713,11 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
                     type="text"
                     placeholder="Enter 6-digit code"
                     value={verifyInput}
-                    onChange={(e) => setVerifyInput(e.target.value)}
+                    onChange={(e) => setVerifyInput(e.target.value.replace(/\s/g, ''))}
                     maxLength={6}
                     disabled={isLoading}
                     required
+                    autoFocus
                   />
                 </div>
               </div>
@@ -820,20 +725,45 @@ export function Login({ onLogin, onNavigate, onBackToHome }: LoginProps) {
               <button type="submit" className="auth-submit-btn" disabled={isLoading}>
                 {isLoading ? "Verifying…" : "Verify Email"}
               </button>
+
+              <div style={{ marginTop: 12, textAlign: "center" }}>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendCooldown > 0 || isResending}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: resendCooldown > 0 ? "#a6a6a6" : "#ff3131",
+                    cursor: resendCooldown > 0 ? "not-allowed" : "pointer",
+                    textDecoration: "underline",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    padding: "8px 16px",
+                  }}
+                >
+                  {isResending ? (
+                    "Sending..."
+                  ) : resendCooldown > 0 ? (
+                    `Resend code in ${resendCooldown}s`
+                  ) : (
+                    "Didn't receive the code? Resend"
+                  )}
+                </button>
+              </div>
             </form>
           )}
 
-          {/* ── FOOTER ── */}
           <div className="auth-footer-links">
-            {onBackToHome && (
-              <button type="button" className="auth-text-btn guest" onClick={onBackToHome}>
-                ← Browse as Guest
-              </button>
-            )}
+            <button type="button" className="auth-text-btn guest" onClick={() => onNavigate("home")}>
+              ← Browse as Guest
+            </button>
             <p className="auth-support">Need help? Email admin@tup.edu.ph</p>
           </div>
         </div>
       </div>
+
+      <Footer onNavigate={onNavigate} />
     </div>
   );
 }

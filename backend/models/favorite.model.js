@@ -2,10 +2,35 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FavoriteModel = void 0;
 const mongoose_1 = require("mongoose");
+
 const favoriteSchema = new mongoose_1.Schema({
-    userId: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    targetType: { type: String, required: true, enum: ["stall", "menuItem"], index: true },
-    targetId: { type: mongoose_1.Schema.Types.ObjectId, required: true, index: true }
+    studentId: { 
+        type: mongoose_1.Schema.Types.ObjectId, 
+        ref: "Student", 
+        required: true, 
+        index: true 
+    },
+    productId: { 
+        type: mongoose_1.Schema.Types.ObjectId, 
+        ref: "Product", 
+        required: true, 
+        index: true 
+    },
+    course: { 
+        type: String, 
+        required: true,
+        index: true 
+    },
+    category: { 
+        type: String, 
+        required: true,
+        index: true 
+    },
+    productName: { type: String, required: true },
+    stallName: { type: String, required: true }
 }, { timestamps: true });
-favoriteSchema.index({ userId: 1, targetType: 1, targetId: 1 }, { unique: true });
+
+// Ensure a student can only favorite a product once
+favoriteSchema.index({ studentId: 1, productId: 1 }, { unique: true });
+
 exports.FavoriteModel = (0, mongoose_1.model)("Favorite", favoriteSchema);

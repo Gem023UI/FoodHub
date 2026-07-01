@@ -15,7 +15,6 @@ const vendorSchema = new mongoose_1.Schema(
       trim: true, 
       lowercase: true, 
       unique: true,
-      // ⭐ REMOVE: index: true,
     },
     passwordHash: { type: String, required: true, select: false },
     role:         { type: String, default: "vendor", immutable: true },
@@ -33,11 +32,18 @@ const vendorSchema = new mongoose_1.Schema(
     emailVerificationCode:    { type: String, select: false, default: null },
     emailVerificationExpires: { type: Date,   select: false, default: null },
     lastVerificationSentAt:   { type: Date,   select: false, default: null },
+    stallId: { 
+      type: mongoose_1.Schema.Types.ObjectId, 
+      ref: "Stall", 
+      required: true,  // ← REQUIRED
+      // REMOVE: index: true - we'll use schema.index() below instead
+    },
   },
   { timestamps: true, collection: "vendors" }
 );
 
 // ── Indexes ─────────────────────────────────────────
 vendorSchema.index({ status: 1, isActive: 1 });
+vendorSchema.index({ stallId: 1 }); // ← Only define index here, not on the field
 
 exports.VendorModel = (0, mongoose_1.model)("Vendor", vendorSchema);

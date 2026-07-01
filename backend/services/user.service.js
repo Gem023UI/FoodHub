@@ -91,6 +91,7 @@ async function updateStudent(studentId, updates) {
 async function listVendors() {
   return models_1.VendorModel.find({})
     .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
+    .populate('stallId', 'name location')
     .sort({ createdAt: -1 })
     .lean();
 }
@@ -101,7 +102,7 @@ async function updateVendor(vendorId, updates) {
   const allowed = [
     "firstName", "lastName", "email", "profilePictureUrl",
     "contactNumber", "proofOfLegitimacyUrl",
-    "isActive", "status",
+    "isActive", "status", "stallId",
   ];
   const sanitized = {};
   for (const f of allowed) {
@@ -114,6 +115,7 @@ async function updateVendor(vendorId, updates) {
   return models_1.VendorModel
     .findByIdAndUpdate(vendorId, { $set: sanitized }, { new: true })
     .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
+    .populate('stallId', 'name location')
     .lean();
 }
 

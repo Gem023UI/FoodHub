@@ -16,7 +16,6 @@ const adminSchema = new mongoose_1.Schema(
       trim: true, 
       lowercase: true, 
       unique: true,
-      // ⭐ REMOVE: index: true,
     },
     passwordHash:  { type: String, required: true, select: false },
     role:          { type: String, default: "admin", immutable: true },

@@ -1,30 +1,51 @@
 import { useState, useEffect } from "react";
 import { Login } from "./pages/Login";
-import { StallPicker } from "./pages/StallPicker";
-import { Menu } from "./components/Menu";
-import { Header } from "./components/Header";
-import { HomePage } from "./pages/LandingPage";
-import { AdminDashboard } from "./pages/AdminDashboard";
-import { VendorDashboard } from "./pages/VendorDashboard";
+import { LandingPage } from "./pages/LandingPage";
 import { Profile } from "./pages/Profile";
-import { AboutUs } from "./pages/AboutUs";
+import { VendorStallPage } from "./pages/VendorStall";
+import { Stalls } from "./pages/Stalls";
 import Trends from "./pages/Trends";
-import { OrdersList } from "./pages/OrdersList";
+import { AboutUs } from "./pages/AboutUs";
+import { Cart } from "./pages/Cart";
+import { Preorder } from "./pages/Preorder";
+import { Product } from "./pages/Product";
+import { VendorOrders } from "./pages/VendorOrders";
+import { VendorRevenue } from "./pages/VendorRevenue";
+import { VendorProfile } from "./pages/VendorProfile";
+import { VendorProducts } from "./pages/VendorProducts";
+import Loader from "./components/Loader";
+import "./styles.css";
 
-import "./styles/LandingPage.css";
-
-type AppView = "home" | "login" | "stall-picker" | "menu" | "admin" | "vendor" | "profile" | "about" | "trends" | "orders";
+type AppView = 
+  | "home" 
+  | "login" 
+  | "profile" 
+  | "vendor-profile"
+  | "vendor-stall"
+  | "vendor-orders"
+  | "vendor-revenue"
+  | "stalls"
+  | "trends"
+  | "about"
+  | "cart"
+  | "preorder"
+  | "product"
+  | "stall"
+  | `product/${string}`;
 
 function App() {
-const [view, setView] = useState<AppView>("home");
+  const [view, setView] = useState<AppView>("home");
   const [token, setToken] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [userProfilePic, setUserProfilePic] = useState<string | null>(null);
-  const [selectedStallId, setSelectedStallId] = useState<string | null>(null);
-  const [selectedStallName, setSelectedStallName] = useState<string | null>(null);
-  const [previousView, setPreviousView] = useState<AppView>("stall-picker");
+  const [vendorStallId, setVendorStallId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cartCount, setCartCount] = useState(0);
+  const [preorderData, setPreorderData] = useState<any>(null);
+  const [productId, setProductId] = useState<string | null>(null);
+  const [stallId, setStallId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for stored auth on mount
@@ -33,6 +54,10 @@ const [view, setView] = useState<AppView>("home");
     const storedRole = localStorage.getItem("role");
     const storedName = localStorage.getItem("userName");
     const storedPic = localStorage.getItem("userProfilePic");
+    const storedStallId = localStorage.getItem("vendorStallId");
+
+    // Load cart count
+    updateCartCount();
 
     if (storedToken && storedUserId && storedRole) {
       setToken(storedToken);
@@ -40,46 +65,57 @@ const [view, setView] = useState<AppView>("home");
       setRole(storedRole);
       setUserName(storedName);
       setUserProfilePic(storedPic);
-      if (storedRole === "admin") {
-        setView("admin");
-      } else if (storedRole === "vendor") {
-        setView("vendor");
+      setVendorStallId(storedStallId);
+      
+      if (storedRole === "vendor") {
+        setView("vendor-stall");
       } else {
         setView("home");
       }
+    } else {
+      setView("home");
     }
+    setIsLoading(false);
   }, []);
 
-  const handleLogin = (newToken: string, newUserId: string, newRole: string, newName?: string, newProfilePic?: string | null) => {
+  // Update cart count whenever localStorage changes
+  const updateCartCount = () => {
+    try {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const count = cart.reduce((sum: number, item: any) => sum + item.quantity, 0);
+      setCartCount(count);
+    } catch {
+      setCartCount(0);
+    }
+  };
+
+  const handleLogin = (
+    newToken: string,
+    newUserId: string,
+    newRole: string,
+    newName?: string,
+    newProfilePic?: string | null,
+    stallId?: string
+  ) => {
     setToken(newToken);
     setUserId(newUserId);
     setRole(newRole);
     setUserName(newName ?? null);
     setUserProfilePic(newProfilePic ?? null);
+    setVendorStallId(stallId ?? null);
+    
     localStorage.setItem("token", newToken);
     localStorage.setItem("userId", newUserId);
     localStorage.setItem("role", newRole);
     if (newName) localStorage.setItem("userName", newName);
     if (newProfilePic) localStorage.setItem("userProfilePic", newProfilePic);
-    if (newRole === "admin") {
-      setView("admin");
-    } else if (newRole === "vendor") {
-      setView("vendor");
+    if (stallId) localStorage.setItem("vendorStallId", stallId);
+    
+    if (newRole === "vendor") {
+      setView("vendor-stall");
     } else {
       setView("home");
     }
-  };
-
-  const handleSelectStall = (stallId: string, stallName: string) => {
-    setSelectedStallId(stallId);
-    setSelectedStallName(stallName);
-    setView("menu");
-  };
-
-  const handleBackToStallPicker = () => {
-    setSelectedStallId(null);
-    setSelectedStallName(null);
-    setView("stall-picker");
   };
 
   const handleLogout = () => {
@@ -88,12 +124,14 @@ const [view, setView] = useState<AppView>("home");
     localStorage.removeItem("role");
     localStorage.removeItem("userName");
     localStorage.removeItem("userProfilePic");
+    localStorage.removeItem("vendorStallId");
     setToken(null);
     setUserId(null);
     setRole(null);
     setUserName(null);
     setUserProfilePic(null);
-    setView("login");
+    setVendorStallId(null);
+    setView("home");
   };
 
   const handleProfileUpdate = (name: string, profilePicUrl: string | null) => {
@@ -107,109 +145,155 @@ const [view, setView] = useState<AppView>("home");
     }
   };
 
-  const handleNavigate = (newView: string) => {
-    setPreviousView(view);
-    if (newView === "stalls") {
-      setView("stall-picker");
-    } else {
-      setView(newView as AppView);
+  const handleNavigate = (page: string, data?: any) => {
+    // Handle product navigation with ID
+    if (page.startsWith("product/")) {
+      const id = page.split("/")[1];
+      setProductId(id);
+      setView("product");
+      return;
     }
+    
+    // Handle stall navigation with ID
+    if (page.startsWith("stall/")) {
+      const id = page.split("/")[1];
+      setStallId(id);
+      setView("stalls");
+      return;
+    }
+    
+    if (page === "preorder" && data) {
+      setPreorderData(data);
+    }
+    setView(page as AppView);
   };
 
-  const handleBackToPrevious = () => {
-    setView(previousView);
-  };
+  if (isLoading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+        <Loader />
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
       {view === "home" && (
-        <HomePage onNavigate={(p) => handleNavigate(p as AppView)} token={token} />
+        <LandingPage 
+          onNavigate={handleNavigate} 
+          token={token} 
+          onLogout={handleLogout}
+        />
       )}
+
       {view === "login" && (
         <Login
           onLogin={handleLogin}
           onNavigate={handleNavigate}
-          onBackToHome={() => setView("home")}
         />
       )}
 
-
-      {view === "stall-picker" && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <StallPicker token={token ?? undefined} onSelectStall={handleSelectStall} />
-          </main>
-        </div>
-      )}
-
-      {view === "menu" && selectedStallId && selectedStallName && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <Menu
-              token={token ?? undefined}
-              stallId={selectedStallId}
-              stallName={selectedStallName}
-              onBack={handleBackToStallPicker}
-              onRequireLogin={() => setView("login")}
-            />
-          </main>
-        </div>
-      )}
-
-      {view === "admin" && token && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <AdminDashboard token={token} />
-          </main>
-        </div>
-      )}
-
-      {view === "vendor" && token && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <VendorDashboard token={token} />
-          </main>
-        </div>
-      )}
-
       {view === "profile" && token && userId && role && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <Profile token={token} userId={userId} role={role} onBack={handleBackToPrevious} onProfileUpdate={handleProfileUpdate} />
-          </main>
-        </div>
+        <Profile
+          token={token}
+          userId={userId}
+          role={role}
+          onNavigate={handleNavigate}
+          onProfileUpdate={handleProfileUpdate}
+        />
       )}
 
-      {view === "orders" && token && userId && role && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <OrdersList token={token} userId={userId} role={role} onBack={handleBackToPrevious} />
-          </main>
-        </div>
-      )}
-
-      {view === "about" && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <AboutUs />
-          </main>
-        </div>
+      {view === "stalls" && (
+        <Stalls 
+          token={token ?? undefined} 
+          onNavigate={handleNavigate}
+          stallId={stallId || undefined}
+        />
       )}
 
       {view === "trends" && (
-        <div className="app-with-header">
-          <Header onNavigate={handleNavigate} token={token} />
-          <main className="app-main">
-            <Trends token={token ?? undefined} onBack={handleBackToPrevious} />
-          </main>
-        </div>
+        <Trends 
+          token={token ?? undefined} 
+          onNavigate={handleNavigate} 
+          onLogout={handleLogout}
+          onBack={() => handleNavigate("home")} 
+        />
+      )}
+
+      {view === "about" && (
+        <AboutUs 
+          onNavigate={handleNavigate} 
+          token={token} 
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "cart" && token && (
+        <Cart
+          token={token}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "preorder" && token && (
+        <Preorder
+          token={token}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          preorderData={preorderData}
+        />
+      )}
+
+      {view === "product" && token && productId && (
+        <Product
+          token={token}
+          productId={productId}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "vendor-stall" && token && (
+        <VendorStallPage
+          token={token}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "vendor-products" && token && (
+        <VendorProducts
+          token={token}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "vendor-orders" && token && (
+        <VendorOrders
+          token={token}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "vendor-revenue" && token && (
+        <VendorRevenue
+          token={token}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {view === "vendor-profile" && token && userId && (
+        <VendorProfile
+          token={token}
+          userId={userId}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          onProfileUpdate={handleProfileUpdate}
+        />
       )}
     </div>
   );

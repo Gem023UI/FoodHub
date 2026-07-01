@@ -1,0 +1,414 @@
+.profile-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fafaf8;
+}
+
+.profile-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  flex: 1;
+  width: 100%;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.profile-header h1 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 900;
+  font-size: 28px;
+  color: #1a1a1a;
+}
+
+.profile-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.profile-error {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.profile-error p {
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.profile-error button {
+  padding: 10px 24px;
+  background: #ff3131;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.alert-error {
+  background: #fff2f2;
+  border: 1px solid #ffc9c9;
+  color: #cc0000;
+}
+
+.alert-success {
+  background: #f0faf0;
+  border: 1px solid #b2e5b2;
+  color: #2d7a2d;
+}
+
+.profile-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.profile-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+  padding: 32px;
+}
+
+.profile-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ff3131, #ff6b6b);
+  border: 4px solid #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.role-badge {
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge {
+  padding: 4px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  background: #4caf50;
+  color: white;
+}
+
+.status-badge.inactive {
+  background: #f44336;
+  color: white;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.info-field:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.info-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a6a6a6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-field p {
+  font-size: 15px;
+  color: #1a1a1a;
+}
+
+.info-field p.not-set {
+  color: #ccc;
+  font-style: italic;
+}
+
+.btn-primary {
+  padding: 12px 24px;
+  background: #ff3131;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: flex-start;
+}
+
+.btn-primary:hover {
+  background: #cc0000;
+}
+
+.btn-secondary {
+  padding: 12px 24px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.btn-back:hover {
+  background: #f0f0f0;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.form-group input {
+  padding: 10px 14px;
+  border: 1.5px solid #e8e8e4;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.15s;
+  background: #fafaf8;
+}
+
+.form-group input:focus {
+  border-color: #ff3131;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 49, 49, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.nutrition-summary {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fafaf8;
+  border-radius: 12px;
+}
+
+.nutrition-summary h3 {
+  font-size: 16px;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.nutrition-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.nutrition-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: white;
+  border-radius: 8px;
+}
+
+.nutrition-stat .stat-label {
+  font-size: 11px;
+  color: #a6a6a6;
+  font-weight: 500;
+}
+
+.nutrition-stat .stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.orders-summary {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+  padding: 24px;
+}
+
+.orders-summary h3 {
+  font-size: 16px;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fafaf8;
+  border-radius: 8px;
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.order-stall {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.order-date {
+  font-size: 12px;
+  color: #a6a6a6;
+}
+
+.order-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-total {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.order-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.order-status.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.order-status.preparing {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.order-status.ready {
+  background: #d4edda;
+  color: #155724;
+}
+
+.order-status.completed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.order-status.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 20px 12px;
+  }
+  
+  .profile-card {
+    padding: 20px;
+  }
+  
+  .nutrition-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .btn-primary, .btn-secondary {
+    width: 100%;
+    text-align: center;
+  }
+}

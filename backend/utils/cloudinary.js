@@ -26,4 +26,17 @@ function createVendorUpload() {
   return multer({ storage });
 }
 
-module.exports = { initCloudinary, createVendorUpload };
+function createProductUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/products",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 800, height: 800, crop: "limit" }],
+    },
+  });
+  return multer({ storage });
+}
+
+module.exports = { initCloudinary, createVendorUpload, createProductUpload };

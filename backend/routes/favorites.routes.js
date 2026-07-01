@@ -1,50 +1,195 @@
 "use strict";
+
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.favoritesRouter = void 0;
+
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const favorite_service_1 = require("../services/favorite.service");
+const models_1 = require("../models");
+const product_service_1 = require("../services/product.service");
+
 const favoritesRouter = (0, express_1.Router)();
 exports.favoritesRouter = favoritesRouter;
-favoritesRouter.get("/me", auth_1.authenticateRequest, async (request, response) => {
-    if (!request.userId) {
-        response.status(401).json({ message: "Unauthorized." });
+
+function firstParam(value) {
+    return Array.isArray(value) ? value[0] : value;
+}
+
+// ─── TOGGLE FAVORITE ────────────────────────────────────────────────────
+favoritesRouter.post("/toggle", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+    const { productId } = request.body;
+
+    if (!productId) {
+        response.status(400).json({ message: "Product ID is required." });
         return;
     }
-    const favorites = await (0, favorite_service_1.listFavoritesByUser)(request.userId);
-    response.json({ favorites });
+
+    try {
+        // Get product details
+        const product = await models_1.ProductModel.findById(productId).populate("stallId", "name");
+        if (!product) {
+            response.status(404).json({ message: "Product not found." });
+            return;
+        }
+
+        // Check if already favorited
+        const existing = await models_1.FavoriteModel.findOne({ 
+            studentId, 
+            productId 
+        });
+
+        let isFavorited = false;
+
+        if (existing) {
+            // Remove favorite
+            await models_1.FavoriteModel.findByIdAndDelete(existing._id);
+            await (0, product_service_1.decrementFavoriteCount)(productId);
+            isFavorited = false;
+        } else {
+            // Add favorite
+            await models_1.FavoriteModel.create({
+                studentId,
+                productId,
+                course: request.userCourse || "Unknown",
+                category: product.category,
+                productName: product.name,
+                stallName: product.stallId?.name || "Unknown"
+            });
+            await (0, product_service_1.incrementFavoriteCount)(productId);
+            isFavorited = true;
+        }
+
+        response.json({ isFavorited });
+    } catch (error) {
+        console.error("Error toggling favorite:", error);
+        response.status(500).json({ message: "Failed to toggle favorite." });
+    }
 });
-favoritesRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
-    if (!request.userId) {
-        response.status(401).json({ message: "Unauthorized." });
+
+// ─── CHECK IF FAVORITED ──────────────────────────────────────────────────
+favoritesRouter.get("/check/:productId", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+    const productId = firstParam(request.params.productId);
+
+    if (!productId) {
+        response.status(400).json({ message: "Product ID is required." });
         return;
     }
-    const { targetType, targetId } = request.body;
-    if (!targetType || !targetId) {
-        response.status(400).json({ message: "targetType and targetId are required." });
-        return;
+
+    try {
+        const existing = await models_1.FavoriteModel.findOne({ 
+            studentId, 
+            productId 
+        });
+        response.json({ isFavorited: !!existing });
+    } catch (error) {
+        console.error("Error checking favorite:", error);
+        response.status(500).json({ message: "Failed to check favorite." });
     }
-    const favorite = await (0, favorite_service_1.addFavorite)(request.userId, { targetType, targetId });
-    if (!favorite) {
-        response.status(404).json({ message: "Target not found." });
-        return;
-    }
-    response.status(201).json({ favorite });
 });
-favoritesRouter.delete("/", auth_1.authenticateRequest, async (request, response) => {
-    if (!request.userId) {
-        response.status(401).json({ message: "Unauthorized." });
-        return;
+
+// ─── GET STUDENT FAVORITES ──────────────────────────────────────────────
+favoritesRouter.get("/", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+
+    try {
+        const favorites = await models_1.FavoriteModel.find({ studentId })
+            .populate("productId")
+            .sort({ createdAt: -1 })
+            .lean();
+        
+        response.json({ favorites });
+    } catch (error) {
+        console.error("Error fetching favorites:", error);
+        response.status(500).json({ message: "Failed to fetch favorites." });
     }
-    const { targetType, targetId } = request.body;
-    if (!targetType || !targetId) {
-        response.status(400).json({ message: "targetType and targetId are required." });
-        return;
+});
+
+// ─── GET MOST FAVORITED PRODUCTS ────────────────────────────────────────
+favoritesRouter.get("/trending", async (request, response) => {
+    try {
+        const trending = await models_1.FavoriteModel.aggregate([
+            {
+                $group: {
+                    _id: "$productId",
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $lookup: {
+                    from: "products",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "product"
+                }
+            },
+            { $unwind: "$product" },
+            {
+                $project: {
+                    productId: "$_id",
+                    name: "$product.name",
+                    price: "$product.price",
+                    category: "$product.category",
+                    favoriteCount: "$count",
+                    nutrition: "$product.nutrition"
+                }
+            },
+            { $sort: { favoriteCount: -1 } },
+            { $limit: 10 }
+        ]);
+
+        response.json(trending);
+    } catch (error) {
+        console.error("Error fetching trending:", error);
+        response.status(500).json({ message: "Failed to fetch trending." });
     }
-    const deleted = await (0, favorite_service_1.removeFavorite)(request.userId, targetType, targetId);
-    if (!deleted) {
-        response.status(404).json({ message: "Favorite not found." });
-        return;
+});
+
+// ─── GET MOST FAVORITED BY CATEGORY ─────────────────────────────────────
+favoritesRouter.get("/trending/category/:category", async (request, response) => {
+    const category = firstParam(request.params.category);
+
+    try {
+        const trending = await models_1.FavoriteModel.aggregate([
+            {
+                $lookup: {
+                    from: "products",
+                    localField: "productId",
+                    foreignField: "_id",
+                    as: "product"
+                }
+            },
+            { $unwind: "$product" },
+            {
+                $match: {
+                    "product.category": category
+                }
+            },
+            {
+                $group: {
+                    _id: "$productId",
+                    count: { $sum: 1 },
+                    product: { $first: "$product" }
+                }
+            },
+            {
+                $project: {
+                    productId: "$_id",
+                    name: "$product.name",
+                    price: "$product.price",
+                    category: "$product.category",
+                    favoriteCount: "$count",
+                    nutrition: "$product.nutrition"
+                }
+            },
+            { $sort: { favoriteCount: -1 } },
+            { $limit: 10 }
+        ]);
+
+        response.json(trending);
+    } catch (error) {
+        console.error("Error fetching trending by category:", error);
+        response.status(500).json({ message: "Failed to fetch trending by category." });
     }
-    response.status(204).send();
 });
