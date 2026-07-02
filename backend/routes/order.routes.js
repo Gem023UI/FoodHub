@@ -5,7 +5,8 @@ exports.orderRouter = void 0;
 
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const order_service_1 = require("../services/order.service");
+const order_controller_1 = require("../controllers/order.controller");
+const stall_controller_1 = require("../controllers/stall.controller");
 
 const orderRouter = (0, express_1.Router)();
 exports.orderRouter = orderRouter;
@@ -16,7 +17,7 @@ function firstParam(value) {
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
-    const { stallId, items, paymentMethod, gcashNumber, pickupTime } = request.body;
+    const { stallId, items, paymentMethod, pickupTime } = request.body;
     const studentId = request.userId;
 
     if (!stallId || !items || !items.length || !paymentMethod || !pickupTime) {
@@ -26,28 +27,21 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
         return;
     }
 
-    // Validate GCash number if payment method is GCash
-    if (paymentMethod === "GCash" && !gcashNumber) {
-        response.status(400).json({ 
-            message: "GCash number is required for GCash payments." 
-        });
-        return;
-    }
-
-    const result = await (0, order_service_1.createOrder)({
+    const result = await (0, order_controller_1.createOrder)({
         studentId,
         stallId,
         items,
         paymentMethod,
-        gcashNumber,
         pickupTime
     });
 
     if (!result.success) {
         const messages = {
             stall_not_found: "Stall not found.",
+            student_not_found: "Student not found.",
             product_not_found: "Product not found.",
-            product_unavailable: "Product is unavailable."
+            product_unavailable: "Product is unavailable.",
+            insufficient_stock: "Insufficient stock for product."
         };
         response.status(400).json({ 
             message: messages[result.reason] || "Failed to create order." 
@@ -63,7 +57,7 @@ orderRouter.get("/student", auth_1.authenticateRequest, async (request, response
     const studentId = request.userId;
     
     try {
-        const orders = await (0, order_service_1.getStudentOrders)(studentId);
+        const orders = await (0, order_controller_1.getStudentOrders)(studentId);
         response.json({ orders });
     } catch (error) {
         console.error("Error fetching student orders:", error);
@@ -71,15 +65,26 @@ orderRouter.get("/student", auth_1.authenticateRequest, async (request, response
     }
 });
 
-// ── GET VENDOR ORDERS ──────────────────────────────────────────────────
-orderRouter.get("/vendor", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor", "admin"), async (request, response) => {
-    const vendorId = request.userId;
+// ── GET STALL ORDERS ──────────────────────────────────────────────────
+orderRouter.get("/stall/:stallId", auth_1.authenticateRequest, async (request, response) => {
+    const stallId = firstParam(request.params.stallId);
     
     try {
-        const orders = await (0, order_service_1.getVendorOrders)(vendorId);
+        // Verify user has access to this stall
+        const isAdmin = request.role === "admin";
+        const isVendor = request.role === "vendor";
+        
+        if (isVendor) {
+            const stall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
+            if (!stall || stall._id.toString() !== stallId) {
+                return response.status(403).json({ message: "Unauthorized to view these orders." });
+            }
+        }
+
+        const orders = await (0, order_controller_1.getStallOrders)(stallId);
         response.json({ orders });
     } catch (error) {
-        console.error("Error fetching vendor orders:", error);
+        console.error("Error fetching stall orders:", error);
         response.status(500).json({ message: "Failed to fetch orders." });
     }
 });
@@ -89,7 +94,7 @@ orderRouter.get("/:orderId", auth_1.authenticateRequest, async (request, respons
     const orderId = firstParam(request.params.orderId);
     
     try {
-        const order = await (0, order_service_1.getOrderById)(orderId);
+        const order = await (0, order_controller_1.getOrderById)(orderId);
         if (!order) {
             response.status(404).json({ message: "Order not found." });
             return;
@@ -97,8 +102,15 @@ orderRouter.get("/:orderId", auth_1.authenticateRequest, async (request, respons
 
         // Check authorization
         const isStudent = order.studentId._id.toString() === request.userId;
-        const isVendor = await (0, order_service_1.isVendorForStall)(request.userId, order.stallId._id.toString());
         const isAdmin = request.role === "admin";
+        
+        let isVendor = false;
+        if (request.role === "vendor") {
+            const stall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
+            if (stall && stall._id.toString() === order.stallId._id.toString()) {
+                isVendor = true;
+            }
+        }
 
         if (!isStudent && !isVendor && !isAdmin) {
             response.status(403).json({ message: "Unauthorized to view this order." });
@@ -116,29 +128,28 @@ orderRouter.get("/:orderId", auth_1.authenticateRequest, async (request, respons
 orderRouter.patch("/:orderId/status", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor", "admin"), async (request, response) => {
     const orderId = firstParam(request.params.orderId);
     const { status } = request.body;
-    const vendorId = request.userId;
+    const userEmail = request.userEmail;
 
     if (!status) {
         response.status(400).json({ message: "Status is required." });
         return;
     }
 
-    const validStatuses = ["Pending", "Preparing", "Ready", "Completed", "Cancelled"];
-    if (!validStatuses.includes(status)) {
+    const validStatuses = ["pending", "preparing", "ready", "completed", "cancelled"];
+    if (!validStatuses.includes(status.toLowerCase())) {
         response.status(400).json({ 
             message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` 
         });
         return;
     }
 
-    const result = await (0, order_service_1.updateOrderStatus)(orderId, status, vendorId);
+    const result = await (0, order_controller_1.updateOrderStatus)(orderId, status.toLowerCase(), userEmail);
     
     if (!result.success) {
         const messages = {
             order_not_found: "Order not found.",
             unauthorized: "You are not authorized to update this order.",
-            order_finalized: "Cannot update a completed or cancelled order.",
-            payment_required: "Payment must be completed before updating order status."
+            order_finalized: "Cannot update a completed or cancelled order."
         };
         response.status(400).json({ 
             message: messages[result.reason] || "Failed to update order status." 
@@ -149,17 +160,67 @@ orderRouter.patch("/:orderId/status", auth_1.authenticateRequest, (0, auth_1.aut
     response.json({ order: result.data.order });
 });
 
-// ── UPDATE PAYMENT STATUS (Webhook) ────────────────────────────────────
-orderRouter.post("/webhook/paymongo", async (request, response) => {
-    // This endpoint will be called by PayMongo webhook
-    // Implementation depends on PayMongo webhook structure
+// ── UPDATE PAYMENT STATUS ──────────────────────────────────────────────────
+orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (request, response) => {
+    const orderId = firstParam(request.params.orderId);
+    const { paymentStatus, paymentData } = request.body;
+
+    if (!paymentStatus) {
+        response.status(400).json({ message: "Payment status is required." });
+        return;
+    }
+
+    const validStatuses = ["pending", "paid", "refunded"];
+    if (!validStatuses.includes(paymentStatus.toLowerCase())) {
+        response.status(400).json({ 
+            message: `Invalid payment status. Must be one of: ${validStatuses.join(", ")}` 
+        });
+        return;
+    }
+
     try {
-        const webhookData = request.body;
-        // Process webhook data
-        // Verify signature, extract payment info, update order
-        response.json({ received: true });
+        // Verify authorization
+        const order = await (0, order_controller_1.getOrderById)(orderId);
+        if (!order) {
+            return response.status(404).json({ message: "Order not found." });
+        }
+
+        const isStudent = order.studentId._id.toString() === request.userId;
+        const isAdmin = request.role === "admin";
+        
+        let isVendor = false;
+        if (request.role === "vendor") {
+            const stall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
+            if (stall && stall._id.toString() === order.stallId._id.toString()) {
+                isVendor = true;
+            }
+        }
+
+        if (!isStudent && !isVendor && !isAdmin) {
+            return response.status(403).json({ message: "Unauthorized to update payment." });
+        }
+
+        // Only students can mark as paid, vendors/admin can mark as refunded
+        if (paymentStatus === "paid" && !isStudent && !isAdmin) {
+            return response.status(403).json({ message: "Only students can mark payment as paid." });
+        }
+
+        if (paymentStatus === "refunded" && !isVendor && !isAdmin) {
+            return response.status(403).json({ message: "Only vendors or admins can refund payments." });
+        }
+
+        const result = await (0, order_controller_1.updatePaymentStatus)(orderId, paymentStatus.toLowerCase(), paymentData);
+        
+        if (!result.success) {
+            response.status(400).json({ 
+                message: messages[result.reason] || "Failed to update payment status." 
+            });
+            return;
+        }
+
+        response.json({ order: result.data.order });
     } catch (error) {
-        console.error("Webhook error:", error);
-        response.status(500).json({ message: "Webhook processing failed." });
+        console.error("Error updating payment:", error);
+        response.status(500).json({ message: "Failed to update payment status." });
     }
 });

@@ -5,7 +5,8 @@ exports.reviewsRouter = void 0;
 
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const review_service_1 = require("../services/review.service");
+const review_controller_1 = require("../controllers/review.controller");
+
 const reviewsRouter = (0, express_1.Router)();
 exports.reviewsRouter = reviewsRouter;
 
@@ -16,13 +17,10 @@ function firstParam(value) {
 // ── GET REVIEWS BY PRODUCT ──────────────────────────────────────────────
 reviewsRouter.get("/product/:productId", async (request, response) => {
     const productId = firstParam(request.params.productId);
-    if (!productId) {
-        response.status(400).json({ message: "Invalid product id." });
-        return;
-    }
+    if (!productId) return response.status(400).json({ message: "Invalid product id." });
 
     try {
-        const reviews = await (0, review_service_1.getReviewsByProduct)(productId);
+        const reviews = await (0, review_controller_1.getReviewsByProduct)(productId);
         response.json({ reviews });
     } catch (error) {
         console.error("Error fetching reviews:", error);
@@ -32,35 +30,35 @@ reviewsRouter.get("/product/:productId", async (request, response) => {
 
 // ── CREATE REVIEW ──────────────────────────────────────────────────────
 reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
+    const { productId, rating, comment, images } = request.body;
     const studentId = request.userId;
-    const { stallId, productId, rating, comment, photos } = request.body;
 
-    if (!stallId || !productId || !rating) {
-        response.status(400).json({ 
-            message: "stallId, productId, and rating are required." 
-        });
-        return;
+    if (!productId || !rating) {
+        return response.status(400).json({ message: "productId and rating are required." });
+    }
+
+    if (rating < 1 || rating > 5) {
+        return response.status(400).json({ message: "Rating must be between 1 and 5." });
     }
 
     try {
-        const result = await (0, review_service_1.createReview)({
+        const result = await (0, review_controller_1.createReview)({
             studentId,
-            stallId,
             productId,
             rating,
             comment,
-            photos: photos || []
+            images: images || []
         });
 
         if (!result.success) {
             const messages = {
-                product_not_found: "Product not found.",
-                already_reviewed: "You have already reviewed this product."
+                invalid_product_id: "Invalid product ID.",
+                order_not_completed: "You must have a completed order for this product to review it.",
+                student_not_found: "Student not found.",
+                already_reviewed: "You have already reviewed this product.",
+                product_not_found: "Product not found."
             };
-            response.status(400).json({ 
-                message: messages[result.reason] || "Failed to create review." 
-            });
-            return;
+            return response.status(400).json({ message: messages[result.reason] || "Failed to create review." });
         }
 
         response.status(201).json({ review: result.data.review });
@@ -70,43 +68,15 @@ reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) =>
     }
 });
 
-// ── UPDATE REVIEW VISIBILITY (Admin only) ─────────────────────────────
-reviewsRouter.patch("/:reviewId/visibility", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
-    const reviewId = firstParam(request.params.reviewId);
-    const { isVisible } = request.body;
-
-    if (!reviewId || typeof isVisible !== "boolean") {
-        response.status(400).json({ message: "Invalid request." });
-        return;
-    }
-
-    try {
-        const result = await (0, review_service_1.updateReviewVisibility)(reviewId, isVisible);
-        if (!result.success) {
-            response.status(404).json({ message: "Review not found." });
-            return;
-        }
-        response.json({ review: result.data.review });
-    } catch (error) {
-        console.error("Error updating review:", error);
-        response.status(500).json({ message: "Failed to update review." });
-    }
-});
-
 // ── DELETE REVIEW ──────────────────────────────────────────────────────
-reviewsRouter.delete("/:reviewId", auth_1.authenticateRequest, async (request, response) => {
+reviewsRouter.delete("/:productId/:reviewId", auth_1.authenticateRequest, async (request, response) => {
+    const productId = firstParam(request.params.productId);
     const reviewId = firstParam(request.params.reviewId);
-    if (!reviewId) {
-        response.status(400).json({ message: "Invalid review id." });
-        return;
-    }
+    if (!productId || !reviewId) return response.status(400).json({ message: "Invalid review reference." });
 
     try {
-        const result = await (0, review_service_1.deleteReview)(reviewId);
-        if (!result.success) {
-            response.status(404).json({ message: "Review not found." });
-            return;
-        }
+        const result = await (0, review_controller_1.deleteReview)(productId, reviewId);
+        if (!result.success) return response.status(404).json({ message: "Review not found." });
         response.status(204).send();
     } catch (error) {
         console.error("Error deleting review:", error);

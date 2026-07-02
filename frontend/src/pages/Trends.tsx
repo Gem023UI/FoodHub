@@ -2,30 +2,18 @@ import { useEffect, useState } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getStalls, getProductsByStall } from "../lib/api";
+import { ProductCard } from "../components/ProductCard";
+import { 
+  getTopFavoritesByCourse,
+  getTopFavoritesByPeriod,
+  getAllStallsWithFavorites,
+  type TopFavoriteItem
+} from "../services/favorite.service";
+import type { Product } from "../services/product.service";
 import "../styles/Trends.css";
 
-interface TrendItem {
-  _id: string;
-  name: string;
-  rating?: number;
-  price?: number;
-  favoriteCount?: number;
-  reviewCount?: number;
-  category?: string;
-  nutrition?: {
-    calories: number | null;
-    proteinGrams: number | null;
-  };
-}
-
-interface TrendCategory {
-  title: string;
-  icon: string;
-  items: TrendItem[];
-  isLoading: boolean;
-  error: string | null;
-}
+const CATEGORIES = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
+const COURSES = ["BSIT", "BSCS", "BSIS", "BSBA", "BSHM", "BSEd", "BEED", "BSN", "BSPSYCH", "BSCRIM"];
 
 interface TrendsProps {
   token?: string;
@@ -35,171 +23,180 @@ interface TrendsProps {
 }
 
 export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsProps) {
-  const [trends, setTrends] = useState<Record<string, TrendCategory>>({
-    overall: {
-      title: "Overall Favorites",
-      icon: "🏆",
-      items: [],
-      isLoading: true,
-      error: null
-    },
-    byCategory: {
-      title: "Favorites by Category",
-      icon: "📊",
-      items: [],
-      isLoading: true,
-      error: null
-    },
-    byCourse: {
-      title: "Favorites by Course",
-      icon: "🎓",
-      items: [],
-      isLoading: true,
-      error: null
-    }
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
+  const [courseWinners, setCourseWinners] = useState<Record<string, TopFavoriteItem[]>>({});
+  const [periodWinners, setPeriodWinners] = useState<Record<string, Record<string, TopFavoriteItem[]>>>({
+    today: {}, week: {}, month: {}, all: {}
   });
+  const [isCourseLoading, setIsCourseLoading] = useState(false);
+  const [stallsWithFavorites, setStallsWithFavorites] = useState<any[]>([]);
 
   useEffect(() => {
     loadTrends();
   }, []);
 
+  useEffect(() => {
+    loadCourseWinners(selectedCourse);
+  }, [selectedCourse]);
+
   async function loadTrends() {
+    setIsLoading(true);
+    setError(null);
     try {
-      const stalls = await getStalls();
-      let allProducts: any[] = [];
+      const [periods, stalls] = await Promise.all([
+        Promise.all([
+          getTopFavoritesByPeriod("today"),
+          getTopFavoritesByPeriod("week"),
+          getTopFavoritesByPeriod("month"),
+          getTopFavoritesByPeriod("all"),
+        ]),
+        getAllStallsWithFavorites()
+      ]);
 
-      for (const stall of stalls) {
-        if (stall.isActive) {
-          const products = await getProductsByStall(stall._id);
-          allProducts = [...allProducts, ...products.filter(p => p.isAvailable)];
-        }
-      }
-
-      // Sort by favorite count
-      const sortedByFavorites = [...allProducts].sort((a, b) => (b.favoriteCount || 0) - (a.favoriteCount || 0));
+      setPeriodWinners({
+        today: periods[0],
+        week: periods[1],
+        month: periods[2],
+        all: periods[3]
+      });
+      setStallsWithFavorites(stalls);
       
-      // Group by category
-      const categoryMap: Record<string, any[]> = {};
-      allProducts.forEach(p => {
-        const category = p.category || "Uncategorized";
-        if (!categoryMap[category]) categoryMap[category] = [];
-        categoryMap[category].push(p);
-      });
-
-      // Get top 3 per category
-      const topByCategory = Object.entries(categoryMap).map(([category, products]) => ({
-        category,
-        items: products.sort((a, b) => (b.favoriteCount || 0) - (a.favoriteCount || 0)).slice(0, 3)
-      }));
-
-      // Mock course data (would come from analytics API)
-      const courseData = [
-        { course: "BSIT", products: sortedByFavorites.slice(0, 3) },
-        { course: "BSCS", products: sortedByFavorites.slice(3, 6) },
-        { course: "BSECE", products: sortedByFavorites.slice(6, 9) }
-      ];
-
-      setTrends({
-        overall: {
-          ...trends.overall,
-          items: sortedByFavorites.slice(0, 10),
-          isLoading: false
-        },
-        byCategory: {
-          ...trends.byCategory,
-          items: topByCategory.flatMap(c => c.items).slice(0, 10),
-          isLoading: false
-        },
-        byCourse: {
-          ...trends.byCourse,
-          items: courseData.flatMap(c => c.products),
-          isLoading: false
-        }
-      });
-    } catch (error) {
-      console.error("Failed to load trends:", error);
-      setTrends((prev) => {
-        const next = { ...prev };
-        for (const key of Object.keys(next)) {
-          next[key] = {
-            ...next[key],
-            isLoading: false,
-            error: "Failed to load"
-          };
-        }
-        return next;
-      });
+      await loadCourseWinners(selectedCourse);
+    } catch (err) {
+      console.error("Failed to load trends:", err);
+      setError("Failed to load trends.");
+    } finally {
+      setIsLoading(false);
     }
+  }
+
+  async function loadCourseWinners(course: string) {
+    setIsCourseLoading(true);
+    try {
+      const data = await getTopFavoritesByCourse(course);
+      setCourseWinners(data);
+    } catch (err) {
+      console.error("Failed to load course trends:", err);
+    } finally {
+      setIsCourseLoading(false);
+    }
+  }
+
+  function renderProductCard(item: TopFavoriteItem, key: string) {
+    const product: Product = {
+      _id: item.productId,
+      productName: item.productName,
+      productDescription: item.productDescription || "",
+      productImages: item.productImages || [],
+      category: item.category as any,
+      price: item.price,
+      nutrition: item.nutrition || { calories: null, protein: null, carbs: null, allergen: "" },
+      favorite: item.favorite || item.favoriteCount || 0,
+      stocks: 0,
+      available: true,
+      reviews: [],
+      averageRating: 0,
+      reviewCount: 0,
+      stallId: {
+        _id: item.stallId,
+        stallName: item.stallName,
+        stallPicture: null
+      }
+    };
+
+    return (
+      <ProductCard
+        key={key}
+        product={product}
+        token={token}
+        onClick={() => onNavigate(`product/${item.productId}`)}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="trends-page">
+        <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="trends" />
+        <div className="trends-loading"><Loader /></div>
+        <Footer onNavigate={onNavigate} />
+      </div>
+    );
   }
 
   return (
     <div className="trends-page">
-      <Header 
-        onNavigate={onNavigate} 
-        token={token} 
-        onLogout={onLogout}
-        currentPage="trends"
-      />
+      <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="trends" />
 
       <div className="trends-container">
         <div className="trends-header">
-          <button className="btn-back" onClick={onBack}>
-            ← Back
-          </button>
+          <button className="btn-back" onClick={onBack}>← Back</button>
           <h1>Food Trends & Analytics</h1>
-          <p>Discover what&apos;s trending on campus</p>
+          <p>Discover what's trending on campus</p>
         </div>
 
-        <div className="trends-grid">
-          {Object.entries(trends).map(([key, category]) => (
-            <div key={key} className="trend-section">
-              <h2>
-                <span className="trend-icon">{category.icon}</span>
-                {category.title}
-              </h2>
+        {error && <div className="alert alert-error">{error}</div>}
 
-              {category.isLoading ? (
-                <div className="trend-loading">
-                  <Loader />
+        {/* ── Most favorite by course ── */}
+        <section className="trend-block">
+          <h2><span className="trend-icon">🎓</span> Most Favorite by Course</h2>
+          <select
+            className="trend-course-select"
+            value={selectedCourse}
+            onChange={(e) => setSelectedCourse(e.target.value)}
+          >
+            {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          {isCourseLoading ? (
+            <div className="trend-loading"><Loader /></div>
+          ) : (
+            <div className="trend-categories-grid">
+              {CATEGORIES.map(category => (
+                <div key={category} className="trend-category-section">
+                  <h3>{category}</h3>
+                  <div className="trend-card-grid">
+                    {(courseWinners[category] || []).slice(0, 3).map(item => 
+                      renderProductCard(item, `${category}-${item.productId}`)
+                    )}
+                    {(courseWinners[category] || []).length === 0 && (
+                      <div className="trend-empty">No favorites yet</div>
+                    )}
+                  </div>
                 </div>
-              ) : category.error ? (
-                <div className="trend-error">{category.error}</div>
-              ) : category.items.length === 0 ? (
-                <div className="trend-empty">No data available yet</div>
-              ) : (
-                <ul className="trend-list">
-                  {category.items.map((item, index) => (
-                    <li key={item._id} className="trend-item">
-                      <div className="item-rank">
-                        <span className="rank-number">#{index + 1}</span>
-                      </div>
-                      <div className="item-details">
-                        <div className="item-name">{item.name}</div>
-                        <div className="item-stats">
-                          {item.category && (
-                            <span className="stat category">{item.category}</span>
-                          )}
-                          {item.favoriteCount !== undefined && (
-                            <span className="stat">❤️ {item.favoriteCount}</span>
-                          )}
-                          {item.price !== undefined && (
-                            <span className="stat">₱{item.price.toFixed(2)}</span>
-                          )}
-                          {item.nutrition?.calories && (
-                            <span className="stat">🔥 {item.nutrition.calories} cal</span>
-                          )}
-                          {item.nutrition?.proteinGrams && (
-                            <span className="stat">💪 {item.nutrition.proteinGrams}g</span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </section>
+
+        {/* ── Most favorite per category: today / week / month / all ── */}
+        {(["today", "week", "month", "all"] as const).map(period => (
+          <section className="trend-block" key={period}>
+            <h2>
+              <span className="trend-icon">
+                {period === "today" ? "📅" : period === "week" ? "🗓️" : period === "month" ? "📆" : "🏆"}
+              </span>
+              Most Favorite by Category — {period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "All Time"}
+            </h2>
+            <div className="trend-categories-grid">
+              {CATEGORIES.map(category => (
+                <div key={`${period}-${category}`} className="trend-category-section">
+                  <h3>{category}</h3>
+                  <div className="trend-card-grid">
+                    {((periodWinners[period] || {})[category] || []).slice(0, 3).map(item => 
+                      renderProductCard(item, `${period}-${category}-${item.productId}`)
+                    )}
+                    {((periodWinners[period] || {})[category] || []).length === 0 && (
+                      <div className="trend-empty">No favorites yet</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
 
       <Footer onNavigate={onNavigate} />

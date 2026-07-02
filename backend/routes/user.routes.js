@@ -10,7 +10,8 @@ exports.usersRouter = void 0;
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const models_1 = require("../models");
-const user_service_1 = require("../services/user.service");
+const user_controller_1 = require("../controllers/user.controller");
+const stall_controller_1 = require("../controllers/stall.controller");
 const cloudinary_1 = require("../utils/cloudinary");
 
 const usersRouter = (0, express_1.Router)();
@@ -24,67 +25,45 @@ function firstParam(value) {
 usersRouter.get("/me", auth_1.authenticateRequest, async (request, response) => {
     const userId = request.userId;
     const role = request.role;
-    
-    console.log(`🔍 /me route called: userId=${userId}, role=${role}`);
-
-    if (!userId) {
-        console.log("❌ No userId found in request");
-        response.status(401).json({ message: "Unauthorized - No user ID found." });
-        return;
-    }
 
     try {
         let user = null;
         
         if (role === "student") {
-            console.log("🔍 Fetching student...");
             user = await models_1.StudentModel.findById(userId)
                 .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
                 .lean();
         } else if (role === "vendor") {
-            console.log("🔍 Fetching vendor...");
-            const vendorData = await models_1.VendorModel.findById(userId)
+            const student = await models_1.StudentModel.findById(userId)
                 .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
-                .populate('stallId', 'name location photos openingHours paymentMethods paymentDetails')
                 .lean();
             
-            console.log(`🔍 Vendor found: ${vendorData ? vendorData.email : 'Not found'}`);
-            console.log(`🔍 Vendor stallId raw:`, vendorData?.stallId);
-            
-            // Create a clean user object with both stallId (as string) and populated stall
-            if (vendorData) {
-                // Extract stallId as string
-                const stallIdString = vendorData.stallId?._id?.toString() || vendorData.stallId?.toString() || null;
-                
-                user = {
-                    ...vendorData,
-                    // Keep the populated stall as a separate property
-                    stallData: vendorData.stallId || null,
-                    // Set stallId as string for frontend compatibility
-                    stallId: stallIdString
-                };
-                
-                console.log(`🔍 Vendor stallId (as string): ${user.stallId}`);
-            }
-            
-            // Validate vendor has a stall
-            if (user && !user.stallId) {
-                console.warn(`⚠️ Vendor ${user.email} has no stall assigned!`);
+            if (student) {
+                const stall = await models_1.StallModel.findOne({ "vendors.email": student.email });
+                if (stall) {
+                    const vendorSub = stall.vendors.find(v => v.email === student.email);
+                    user = {
+                        ...student,
+                        stallId: stall._id,
+                        stallName: stall.stallName,
+                        position: vendorSub?.position,
+                        vendorStatus: vendorSub?.status
+                    };
+                } else {
+                    user = student;
+                }
             }
         } else if (role === "admin") {
-            console.log("🔍 Fetching admin...");
             user = await models_1.AdminModel.findById(userId)
                 .select("-passwordHash")
                 .lean();
         }
         
         if (!user) {
-            console.log(`❌ User not found: ${userId}`);
             response.status(404).json({ message: "User not found." });
             return;
         }
         
-        console.log(`✅ User found: ${user.email}`);
         response.json(user);
     } catch (error) {
         console.error("Error fetching user:", error);
@@ -102,13 +81,7 @@ usersRouter.get("/:userId", auth_1.authenticateRequest, async (request, response
     }
 
     try {
-        let user = await models_1.StudentModel.findById(userId)
-            .select("-passwordHash -emailVerificationCode -emailVerificationExpires").lean();
-        if (!user) user = await models_1.VendorModel.findById(userId)
-            .select("-passwordHash -emailVerificationCode -emailVerificationExpires").lean();
-        if (!user) user = await models_1.AdminModel.findById(userId)
-            .select("-passwordHash").lean();
-            
+        let user = await (0, user_controller_1.getUserById)(userId);
         if (!user) {
             response.status(404).json({ message: "User not found." });
             return;
@@ -131,19 +104,19 @@ usersRouter.patch("/:userId", auth_1.authenticateRequest, async (request, respon
 
     try {
         const updates = request.body;
-        if (request.role !== "admin") {
-            delete updates.status;
-            delete updates.isActive;
-            delete updates.role;
-        }
-
         let updated = null;
+        
         if (request.role === "student") {
-            updated = await (0, user_service_1.updateStudent)(userId, updates);
+            const isAdmin = request.role === "admin";
+            updated = await (0, user_controller_1.updateStudent)(userId, updates, isAdmin);
         } else if (request.role === "vendor") {
-            updated = await (0, user_service_1.updateVendor)(userId, updates);
+            const student = await models_1.StudentModel.findById(userId).select("email");
+            if (student) {
+                const isAdmin = request.role === "admin";
+                updated = await (0, user_controller_1.updateVendor)(student.email, updates, isAdmin);
+            }
         } else if (request.role === "admin") {
-            updated = await (0, user_service_1.updateAdmin)(userId, updates);
+            updated = await (0, user_controller_1.updateAdmin)(userId, updates);
         }
 
         if (!updated) {
@@ -160,7 +133,7 @@ usersRouter.patch("/:userId", auth_1.authenticateRequest, async (request, respon
 // ─── STUDENT ROUTES ────────────────────────────────────────────────────
 usersRouter.get("/students", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
     try {
-        const students = await (0, user_service_1.listStudents)();
+        const students = await (0, user_controller_1.listStudents)();
         response.json({ students });
     } catch (error) {
         console.error("Error fetching students:", error);
@@ -171,7 +144,7 @@ usersRouter.get("/students", auth_1.authenticateRequest, (0, auth_1.authorizeRol
 usersRouter.patch("/students/:id", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
     const id = firstParam(request.params.id);
     try {
-        const student = await (0, user_service_1.updateStudent)(id, request.body);
+        const student = await (0, user_controller_1.updateStudent)(id, request.body, true);
         if (!student) {
             response.status(404).json({ message: "Student not found." });
             return;
@@ -201,7 +174,7 @@ usersRouter.delete("/students/:id", auth_1.authenticateRequest, (0, auth_1.autho
 // ─── VENDOR ROUTES ────────────────────────────────────────────────────
 usersRouter.get("/vendors", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
     try {
-        const vendors = await (0, user_service_1.listVendors)();
+        const vendors = await (0, user_controller_1.listVendors)();
         response.json({ vendors });
     } catch (error) {
         console.error("Error fetching vendors:", error);
@@ -209,10 +182,10 @@ usersRouter.get("/vendors", auth_1.authenticateRequest, (0, auth_1.authorizeRole
     }
 });
 
-usersRouter.patch("/vendors/:id", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
-    const id = firstParam(request.params.id);
+usersRouter.patch("/vendors/:email", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+    const email = firstParam(request.params.email);
     try {
-        const vendor = await (0, user_service_1.updateVendor)(id, request.body);
+        const vendor = await (0, user_controller_1.updateVendor)(email, request.body, true);
         if (!vendor) {
             response.status(404).json({ message: "Vendor not found." });
             return;
@@ -224,26 +197,20 @@ usersRouter.patch("/vendors/:id", auth_1.authenticateRequest, (0, auth_1.authori
     }
 });
 
-usersRouter.delete("/vendors/:id", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
-    const id = firstParam(request.params.id);
-    try {
-        const vendor = await models_1.VendorModel.findByIdAndDelete(id);
-        if (!vendor) {
-            response.status(404).json({ message: "Vendor not found." });
-            return;
-        }
-        response.status(204).end();
-    } catch (error) {
-        console.error("Error deleting vendor:", error);
-        response.status(500).json({ message: "Failed to delete vendor." });
+// ─── PROFILE UPLOAD ROUTES ──────────────────────────────────────────────
+const { createStudentProfileUpload, createVendorProfileUpload } = require("../utils/cloudinary");
+const studentProfileUpload = createStudentProfileUpload();
+const vendorProfileUpload = createVendorProfileUpload();
+
+usersRouter.post("/profile/student", auth_1.authenticateRequest, studentProfileUpload.single("profile"), (request, response) => {
+    if (!request.file) {
+        response.status(400).json({ message: "No file uploaded." });
+        return;
     }
+    response.json({ url: request.file.path });
 });
 
-// ─── VENDOR PROOF UPLOAD ──────────────────────────────────────────────
-const { createVendorUpload } = require("../utils/cloudinary");
-const vendorUpload = createVendorUpload();
-
-usersRouter.post("/vendor-proof-upload", vendorUpload.single("proof"), (request, response) => {
+usersRouter.post("/profile/vendor", auth_1.authenticateRequest, vendorProfileUpload.single("profile"), (request, response) => {
     if (!request.file) {
         response.status(400).json({ message: "No file uploaded." });
         return;

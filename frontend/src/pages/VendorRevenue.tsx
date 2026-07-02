@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getVendorOrders } from "../lib/api";
+import { getVendorStall } from "../services/stall.service";
+import {getStallOrders} from "../services/order.service";
 import "../styles/VendorRevenue.css";
 
 interface RevenueData {
@@ -51,9 +52,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
     averageWeekly: 0,
     averageMonthly: 0
   });
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
 
   useEffect(() => {
     loadOrders();
@@ -63,14 +61,15 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
     if (orders.length > 0) {
       calculateRevenue();
     }
-  }, [orders, selectedDate, period]);
+  }, [orders, period]);
 
   async function loadOrders() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getVendorOrders(token);
-      setOrders(data.filter(o => o.orderStatus === "Completed"));
+      const stall = await getVendorStall(token);
+      const data = await getStallOrders(token, stall._id);
+      setOrders(data.filter(o => o.orderStatus === "completed"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load orders");
     } finally {
@@ -79,7 +78,7 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
   }
 
   function calculateRevenue() {
-    const completedOrders = orders.filter(o => o.orderStatus === "Completed");
+    const completedOrders = orders.filter(o => o.orderStatus === "completed");
     
     // Daily revenue (last 7 days)
     const dailyMap: Record<string, number> = {};
@@ -118,27 +117,22 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
       const dateKey = orderDate.toISOString().split('T')[0];
       const monthKey = orderDate.toISOString().slice(0, 7);
       
-      // Calculate week key
       const weekStart = new Date(orderDate);
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekKey = `Week ${weekStart.toISOString().split('T')[0]}`;
 
-      // Add to daily
       if (dailyMap[dateKey] !== undefined) {
         dailyMap[dateKey] += order.totalAmount;
       }
 
-      // Add to weekly
       if (weeklyMap[weekKey] !== undefined) {
         weeklyMap[weekKey] += order.totalAmount;
       }
 
-      // Add to monthly
       if (monthlyMap[monthKey] !== undefined) {
         monthlyMap[monthKey] += order.totalAmount;
       }
 
-      // Add to category
       order.orderLines?.forEach((line: any) => {
         const category = line.category || "General";
         if (!categoryMap[category]) {
@@ -148,7 +142,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
       });
     });
 
-    // Convert to arrays
     const dailyData = Object.entries(dailyMap).map(([date, amount]) => ({ date, amount }));
     const weeklyData = Object.entries(weeklyMap).map(([week, amount]) => ({ week, amount }));
     const monthlyData = Object.entries(monthlyMap).map(([month, amount]) => ({ month, amount }));
@@ -175,27 +168,19 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
 
   function getCurrentData() {
     switch (period) {
-      case "daily":
-        return revenueData.daily;
-      case "weekly":
-        return revenueData.weekly;
-      case "monthly":
-        return revenueData.monthly;
-      default:
-        return revenueData.daily;
+      case "daily": return revenueData.daily;
+      case "weekly": return revenueData.weekly;
+      case "monthly": return revenueData.monthly;
+      default: return revenueData.daily;
     }
   }
 
   function getCurrentAverage() {
     switch (period) {
-      case "daily":
-        return revenueData.averageDaily;
-      case "weekly":
-        return revenueData.averageWeekly;
-      case "monthly":
-        return revenueData.averageMonthly;
-      default:
-        return revenueData.averageDaily;
+      case "daily": return revenueData.averageDaily;
+      case "weekly": return revenueData.averageWeekly;
+      case "monthly": return revenueData.averageMonthly;
+      default: return revenueData.averageDaily;
     }
   }
 
@@ -235,7 +220,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
 
         {error && <div className="alert alert-error">{error}</div>}
 
-        {/* Summary Cards */}
         <div className="revenue-summary-cards">
           <div className="summary-card">
             <div className="summary-icon">💰</div>
@@ -260,7 +244,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
           </div>
         </div>
 
-        {/* Period Selector */}
         <div className="period-selector">
           <button
             className={`period-btn ${period === "daily" ? "active" : ""}`}
@@ -282,7 +265,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
           </button>
         </div>
 
-        {/* Chart */}
         <div className="revenue-chart">
           <h3>Revenue Overview</h3>
           {currentData.length === 0 ? (
@@ -317,7 +299,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
           )}
         </div>
 
-        {/* Category Revenue */}
         <div className="category-revenue">
           <h3>Revenue by Category</h3>
           {revenueData.categoryRevenue.length === 0 ? (

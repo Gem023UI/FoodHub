@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { createOrder } from "../lib/api";
+import { createOrder } from "../services/order.service";
 import "../styles/Preorder.css";
 
 interface PreorderItem {
@@ -10,10 +10,10 @@ interface PreorderItem {
   productName: string;
   price: number;
   quantity: number;
-  photos: string[];
+  productImages: string[];
   nutrition: {
     calories: number | null;
-    proteinGrams: number | null;
+    protein: number | null;
   };
 }
 
@@ -45,9 +45,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     mayaNumber: string | null;
   }>({ gcashNumber: null, mayaNumber: null });
   
-  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "GCash" | "Maya">("Cash");
-  const [gcashNumber, setGcashNumber] = useState("");
-  const [mayaNumber, setMayaNumber] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "paymaya">("cash");
   const [pickupTime, setPickupTime] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +63,16 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       setPaymentMethods(preorderData.paymentMethods || ["Cash"]);
       setPaymentDetails(preorderData.paymentDetails || { gcashNumber: null, mayaNumber: null });
       
-      // Set default payment method to first available
+      const methodMap: Record<string, "cash" | "gcash" | "paymaya"> = {
+        "Cash": "cash",
+        "GCash": "gcash",
+        "Maya": "paymaya"
+      };
       if (preorderData.paymentMethods && preorderData.paymentMethods.length > 0) {
-        setPaymentMethod(preorderData.paymentMethods[0] as "Cash" | "GCash" | "Maya");
+        setPaymentMethod(methodMap[preorderData.paymentMethods[0]] || "cash");
       }
     }
 
-    // Set default pickup time to 30 minutes from now
     const now = new Date();
     now.setMinutes(now.getMinutes() + 30);
     const timeString = now.toTimeString().slice(0, 5);
@@ -85,14 +86,11 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     }
   }, [error]);
 
-  // Update GCash/Maya number when payment method changes
-  useEffect(() => {
-    if (paymentMethod === "GCash" && paymentDetails.gcashNumber) {
-      setGcashNumber(paymentDetails.gcashNumber);
-    } else if (paymentMethod === "Maya" && paymentDetails.mayaNumber) {
-      setMayaNumber(paymentDetails.mayaNumber);
-    }
-  }, [paymentMethod, paymentDetails]);
+  const methodToDisplay: Record<string, string> = {
+    "cash": "Cash",
+    "gcash": "GCash",
+    "paymaya": "Maya"
+  };
 
   async function handlePlaceOrder(e: React.FormEvent) {
     e.preventDefault();
@@ -105,19 +103,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       return;
     }
 
-    // Validate based on payment method
-    if (paymentMethod === "GCash" && !gcashNumber) {
-      setError("Please enter your GCash number.");
-      setIsLoading(false);
-      return;
-    }
-    
-    if (paymentMethod === "Maya" && !mayaNumber) {
-      setError("Please enter your Maya number.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const orderInput = {
         stallId,
@@ -125,9 +110,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
           productId: item.productId,
           quantity: item.quantity
         })),
-        paymentMethod,
-        gcashNumber: paymentMethod === "GCash" ? gcashNumber : undefined,
-        mayaNumber: paymentMethod === "Maya" ? mayaNumber : undefined,
+        paymentMethod: paymentMethod,
         pickupTime
       };
 
@@ -137,15 +120,12 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       setOrderPlaced(true);
       setSuccess("Order placed successfully!");
 
-      // Clear cart after successful order
       localStorage.removeItem("cart");
 
-      // If online payment, simulate payment URL
-      if (paymentMethod === "GCash" || paymentMethod === "Maya") {
-        // In production, this would come from PayMongo
+      if (paymentMethod === "gcash" || paymentMethod === "paymaya") {
+        // In production, this would come from the backend
         setPaymentUrl("https://checkout.paymongo.com/checkout/session");
       }
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to place order");
     } finally {
@@ -194,7 +174,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             </div>
             <div className="order-detail-row">
               <span>Payment:</span>
-              <span>{paymentMethod}</span>
+              <span>{methodToDisplay[paymentMethod]}</span>
             </div>
             <div className="order-detail-row">
               <span>Pickup:</span>
@@ -202,17 +182,17 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             </div>
           </div>
 
-          {(paymentMethod === "GCash" || paymentMethod === "Maya") && paymentUrl && (
+          {(paymentMethod === "gcash" || paymentMethod === "paymaya") && paymentUrl && (
             <div className="payment-section">
               <h3>Complete Your Payment</h3>
-              <p>Click the button below to complete your payment via {paymentMethod}.</p>
+              <p>Click the button below to complete your payment via {methodToDisplay[paymentMethod]}.</p>
               <a
                 href={paymentUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="payment-btn"
               >
-                Pay with {paymentMethod}
+                Pay with {methodToDisplay[paymentMethod]}
               </a>
               <p className="payment-note">
                 After payment, you'll receive a confirmation email.
@@ -224,7 +204,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             <button className="btn-primary" onClick={() => onNavigate("home")}>
               Go Home
             </button>
-            <button className="btn-secondary" onClick={() => onNavigate("orders")}>
+            <button className="btn-secondary" onClick={() => onNavigate("profile")}>
               View Orders
             </button>
           </div>
@@ -235,9 +215,14 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     );
   }
 
-  const availablePaymentMethods = paymentMethods.filter(m => 
-    m === "Cash" || m === "GCash" || m === "Maya"
-  );
+  const availablePaymentMethods = paymentMethods.map(m => {
+    const map: Record<string, "cash" | "gcash" | "paymaya"> = {
+      "Cash": "cash",
+      "GCash": "gcash",
+      "Maya": "paymaya"
+    };
+    return map[m];
+  }).filter(Boolean);
 
   return (
     <div className="preorder-page">
@@ -263,7 +248,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
                 <div key={item.productId} className="order-item">
                   <div className="order-item-image">
                     <img
-                      src={item.photos?.[0] || "https://via.placeholder.com/60x60?text=No+Image"}
+                      src={item.productImages?.[0] || "https://via.placeholder.com/60x60?text=No+Image"}
                       alt={item.productName}
                     />
                   </div>
@@ -292,76 +277,44 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             <div className="form-group">
               <label>Payment Method</label>
               <div className="payment-methods">
-                {availablePaymentMethods.includes("Cash") && (
+                {availablePaymentMethods.includes("cash") && (
                   <label className="payment-method-option">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="Cash"
-                      checked={paymentMethod === "Cash"}
-                      onChange={(e) => setPaymentMethod(e.target.value as "Cash")}
+                      value="cash"
+                      checked={paymentMethod === "cash"}
+                      onChange={(e) => setPaymentMethod(e.target.value as "cash")}
                     />
                     <span className="payment-label">💵 Cash</span>
                   </label>
                 )}
-                {availablePaymentMethods.includes("GCash") && (
+                {availablePaymentMethods.includes("gcash") && (
                   <label className="payment-method-option">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="GCash"
-                      checked={paymentMethod === "GCash"}
-                      onChange={(e) => setPaymentMethod(e.target.value as "GCash")}
+                      value="gcash"
+                      checked={paymentMethod === "gcash"}
+                      onChange={(e) => setPaymentMethod(e.target.value as "gcash")}
                     />
                     <span className="payment-label">📱 GCash</span>
                   </label>
                 )}
-                {availablePaymentMethods.includes("Maya") && (
+                {availablePaymentMethods.includes("paymaya") && (
                   <label className="payment-method-option">
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="Maya"
-                      checked={paymentMethod === "Maya"}
-                      onChange={(e) => setPaymentMethod(e.target.value as "Maya")}
+                      value="paymaya"
+                      checked={paymentMethod === "paymaya"}
+                      onChange={(e) => setPaymentMethod(e.target.value as "paymaya")}
                     />
                     <span className="payment-label">📱 Maya</span>
                   </label>
                 )}
               </div>
             </div>
-
-            {paymentMethod === "GCash" && (
-              <div className="form-group">
-                <label>GCash Number</label>
-                <input
-                  type="tel"
-                  placeholder="09XXXXXXXXX"
-                  value={gcashNumber}
-                  onChange={(e) => setGcashNumber(e.target.value)}
-                  required
-                />
-                <p className="field-help">
-                  Enter your GCash registered mobile number.
-                </p>
-              </div>
-            )}
-
-            {paymentMethod === "Maya" && (
-              <div className="form-group">
-                <label>Maya Number</label>
-                <input
-                  type="tel"
-                  placeholder="09XXXXXXXXX"
-                  value={mayaNumber}
-                  onChange={(e) => setMayaNumber(e.target.value)}
-                  required
-                />
-                <p className="field-help">
-                  Enter your Maya registered mobile number.
-                </p>
-              </div>
-            )}
 
             <div className="form-group">
               <label>Pickup Time</label>

@@ -1,302 +1,212 @@
 import { useState, useEffect } from "react";
-import { Login } from "./pages/Login";
 import { LandingPage } from "./pages/LandingPage";
-import { Profile } from "./pages/Profile";
-import { VendorStallPage } from "./pages/VendorStall";
+import { Login } from "./pages/Login";
 import { Stalls } from "./pages/Stalls";
-import Trends from "./pages/Trends";
-import { AboutUs } from "./pages/AboutUs";
-import { Cart } from "./pages/Cart";
-import { Preorder } from "./pages/Preorder";
 import { Product } from "./pages/Product";
+import { Cart } from "./pages/Cart";
+import { Preorder } from "./pages/PreOrder";
+import { Profile } from "./pages/Profile";
+import { AboutUs } from "./pages/AboutUs";
+import Trends from "./pages/Trends";
+import { AdminDashboard } from "./pages/AdminDashboard";
+import { AdminStalls } from "./pages/AdminStalls";
+import { AdminVendors } from "./pages/AdminVendors";
+import { AdminStudents } from "./pages/AdminStudents";
+import { VendorStallPage } from "./pages/VendorStall";
+import { VendorProducts } from "./pages/VendorProducts";
 import { VendorOrders } from "./pages/VendorOrders";
 import { VendorRevenue } from "./pages/VendorRevenue";
 import { VendorProfile } from "./pages/VendorProfile";
-import { VendorProducts } from "./pages/VendorProducts";
-import Loader from "./components/Loader";
 import "./styles.css";
 
-type AppView = 
+type Page = 
   | "home" 
   | "login" 
+  | "stalls" 
+  | `stall/${string}` 
+  | `product/${string}` 
+  | "cart" 
+  | "preorder" 
   | "profile" 
-  | "vendor-profile"
-  | "vendor-stall"
-  | "vendor-orders"
-  | "vendor-revenue"
-  | "stalls"
+  | "about" 
   | "trends"
-  | "about"
-  | "cart"
-  | "preorder"
-  | "product"
-  | "stall"
-  | `product/${string}`;
+  | "admin" 
+  | "admin-stalls" 
+  | "admin-vendors" 
+  | "admin-students"
+  | "vendor-stall" 
+  | "vendor-products" 
+  | "vendor-orders" 
+  | "vendor-revenue" 
+  | "vendor-profile";
 
-function App() {
-  const [view, setView] = useState<AppView>("home");
+export default function App() {
+  const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [pageParams, setPageParams] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [role, setRole] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
-  const [userProfilePic, setUserProfilePic] = useState<string | null>(null);
-  const [vendorStallId, setVendorStallId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [cartCount, setCartCount] = useState(0);
-  const [preorderData, setPreorderData] = useState<any>(null);
-  const [productId, setProductId] = useState<string | null>(null);
-  const [stallId, setStallId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for stored auth on mount
-    const storedToken = localStorage.getItem("token");
-    const storedUserId = localStorage.getItem("userId");
-    const storedRole = localStorage.getItem("role");
-    const storedName = localStorage.getItem("userName");
-    const storedPic = localStorage.getItem("userProfilePic");
-    const storedStallId = localStorage.getItem("vendorStallId");
+    const savedToken = localStorage.getItem("token");
+    const savedUserId = localStorage.getItem("userId");
+    const savedRole = localStorage.getItem("userRole");
 
-    // Load cart count
-    updateCartCount();
-
-    if (storedToken && storedUserId && storedRole) {
-      setToken(storedToken);
-      setUserId(storedUserId);
-      setRole(storedRole);
-      setUserName(storedName);
-      setUserProfilePic(storedPic);
-      setVendorStallId(storedStallId);
-      
-      if (storedRole === "vendor") {
-        setView("vendor-stall");
-      } else {
-        setView("home");
-      }
-    } else {
-      setView("home");
+    if (savedToken && savedUserId) {
+      setToken(savedToken);
+      setUserId(savedUserId);
+      setUserRole(savedRole);
     }
-    setIsLoading(false);
+
+    updateCartCount();
   }, []);
 
-  // Update cart count whenever localStorage changes
   const updateCartCount = () => {
     try {
       const cart = JSON.parse(localStorage.getItem("cart") || "[]");
       const count = cart.reduce((sum: number, item: any) => sum + item.quantity, 0);
-      setCartCount(count);
+      // Store cart count for header
+      localStorage.setItem("cartCount", String(count));
     } catch {
-      setCartCount(0);
+      localStorage.setItem("cartCount", "0");
     }
   };
 
   const handleLogin = (
-    newToken: string,
-    newUserId: string,
-    newRole: string,
-    newName?: string,
-    newProfilePic?: string | null,
+    token: string,
+    userId: string,
+    role: string,
+    name?: string,
+    profilePictureUrl?: string | null,
     stallId?: string
   ) => {
-    setToken(newToken);
-    setUserId(newUserId);
-    setRole(newRole);
-    setUserName(newName ?? null);
-    setUserProfilePic(newProfilePic ?? null);
-    setVendorStallId(stallId ?? null);
-    
-    localStorage.setItem("token", newToken);
-    localStorage.setItem("userId", newUserId);
-    localStorage.setItem("role", newRole);
-    if (newName) localStorage.setItem("userName", newName);
-    if (newProfilePic) localStorage.setItem("userProfilePic", newProfilePic);
-    if (stallId) localStorage.setItem("vendorStallId", stallId);
-    
-    if (newRole === "vendor") {
-      setView("vendor-stall");
+    setToken(token);
+    setUserId(userId);
+    setUserRole(role);
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("userId", userId);
+    localStorage.setItem("userRole", role);
+    if (name) localStorage.setItem("userName", name);
+    if (profilePictureUrl) localStorage.setItem("userProfilePic", profilePictureUrl);
+    if (stallId) localStorage.setItem("userStallId", stallId);
+
+    if (role === "admin") {
+      setCurrentPage("admin");
+    } else if (role === "vendor") {
+      setCurrentPage("vendor-stall");
     } else {
-      setView("home");
+      setCurrentPage("home");
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("role");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userProfilePic");
-    localStorage.removeItem("vendorStallId");
     setToken(null);
     setUserId(null);
-    setRole(null);
-    setUserName(null);
-    setUserProfilePic(null);
-    setVendorStallId(null);
-    setView("home");
+    setUserRole(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userProfilePic");
+    localStorage.removeItem("userStallId");
+    localStorage.removeItem("cartCount");
+    setCurrentPage("home");
   };
 
-  const handleProfileUpdate = (name: string, profilePicUrl: string | null) => {
-    setUserName(name);
-    setUserProfilePic(profilePicUrl);
-    localStorage.setItem("userName", name);
-    if (profilePicUrl) {
-      localStorage.setItem("userProfilePic", profilePicUrl);
-    } else {
-      localStorage.removeItem("userProfilePic");
-    }
-  };
-
-  const handleNavigate = (page: string, data?: any) => {
-    // Handle product navigation with ID
-    if (page.startsWith("product/")) {
-      const id = page.split("/")[1];
-      setProductId(id);
-      setView("product");
+  const navigate = (page: string, params?: any) => {
+    if (page === "login" && token) {
+      if (userRole === "admin") {
+        setCurrentPage("admin");
+      } else if (userRole === "vendor") {
+        setCurrentPage("vendor-stall");
+      } else {
+        setCurrentPage("home");
+      }
       return;
     }
+
+    setCurrentPage(page as Page);
+    setPageParams(params || null);
     
-    // Handle stall navigation with ID
-    if (page.startsWith("stall/")) {
-      const id = page.split("/")[1];
-      setStallId(id);
-      setView("stalls");
-      return;
+    if (page === "cart" || page === "preorder") {
+      updateCartCount();
     }
-    
-    if (page === "preorder" && data) {
-      setPreorderData(data);
-    }
-    setView(page as AppView);
   };
 
-  if (isLoading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
-        <Loader />
-      </div>
-    );
-  }
+  // Helper to ensure token is defined for protected routes
+  const getToken = (): string | undefined => token || undefined;
+  const getUserId = (): string | undefined => userId || undefined;
 
-  return (
-    <div className="app-container">
-      {view === "home" && (
-        <LandingPage 
-          onNavigate={handleNavigate} 
-          token={token} 
-          onLogout={handleLogout}
-        />
-      )}
+  const renderPage = () => {
+    const commonProps = {
+      token: getToken(),
+      onNavigate: navigate,
+      onLogout: handleLogout,
+    };
 
-      {view === "login" && (
-        <Login
-          onLogin={handleLogin}
-          onNavigate={handleNavigate}
-        />
-      )}
+    // Protected routes that require token
+    if (currentPage === "cart" || currentPage === "preorder" || currentPage === "profile") {
+      if (!token) return <Login onLogin={handleLogin} onNavigate={navigate} />;
+    }
 
-      {view === "profile" && token && userId && role && (
-        <Profile
-          token={token}
-          userId={userId}
-          role={role}
-          onNavigate={handleNavigate}
-          onProfileUpdate={handleProfileUpdate}
-        />
-      )}
+    // Admin routes
+    if (["admin", "admin-stalls", "admin-vendors", "admin-students"].includes(currentPage)) {
+      if (!token || userRole !== "admin") return <Login onLogin={handleLogin} onNavigate={navigate} />;
+    }
 
-      {view === "stalls" && (
-        <Stalls 
-          token={token ?? undefined} 
-          onNavigate={handleNavigate}
-          stallId={stallId || undefined}
-        />
-      )}
+    // Vendor routes
+    if (["vendor-stall", "vendor-products", "vendor-orders", "vendor-revenue", "vendor-profile"].includes(currentPage)) {
+      if (!token || userRole !== "vendor") return <Login onLogin={handleLogin} onNavigate={navigate} />;
+    }
 
-      {view === "trends" && (
-        <Trends 
-          token={token ?? undefined} 
-          onNavigate={handleNavigate} 
-          onLogout={handleLogout}
-          onBack={() => handleNavigate("home")} 
-        />
-      )}
+    switch (currentPage) {
+      case "home":
+        return <LandingPage {...commonProps} />;
+      case "login":
+        return <Login onLogin={handleLogin} onNavigate={navigate} />;
+      case "stalls":
+        return <Stalls {...commonProps} />;
+      case "cart":
+        return <Cart {...commonProps} token={token!} />;
+      case "preorder":
+        return <Preorder {...commonProps} token={token!} preorderData={pageParams} />;
+      case "profile":
+        return <Profile {...commonProps} token={token!} userId={userId!} />;
+      case "about":
+        return <AboutUs {...commonProps} />;
+      case "trends":
+        return <Trends {...commonProps} onBack={() => navigate("home")} />;
+      case "admin":
+        return <AdminDashboard {...commonProps} token={token!} />;
+      case "admin-stalls":
+        return <AdminStalls {...commonProps} token={token!} />;
+      case "admin-vendors":
+        return <AdminVendors {...commonProps} token={token!} />;
+      case "admin-students":
+        return <AdminStudents {...commonProps} token={token!} />;
+      case "vendor-stall":
+        return <VendorStallPage {...commonProps} token={token!} />;
+      case "vendor-products":
+        return <VendorProducts {...commonProps} token={token!} />;
+      case "vendor-orders":
+        return <VendorOrders {...commonProps} token={token!} />;
+      case "vendor-revenue":
+        return <VendorRevenue {...commonProps} token={token!} />;
+      case "vendor-profile":
+        return <VendorProfile {...commonProps} token={token!} userId={userId!} />;
+      default:
+        if (currentPage.startsWith("product/")) {
+          const productId = currentPage.split("/")[1];
+          return <Product {...commonProps} productId={productId} />;
+        }
+        if (currentPage.startsWith("stall/")) {
+          const stallId = currentPage.split("/")[1];
+          return <Stalls {...commonProps} stallId={stallId} />;
+        }
+        return <LandingPage {...commonProps} />;
+    }
+  };
 
-      {view === "about" && (
-        <AboutUs 
-          onNavigate={handleNavigate} 
-          token={token} 
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "cart" && token && (
-        <Cart
-          token={token}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "preorder" && token && (
-        <Preorder
-          token={token}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-          preorderData={preorderData}
-        />
-      )}
-
-      {view === "product" && token && productId && (
-        <Product
-          token={token}
-          productId={productId}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "vendor-stall" && token && (
-        <VendorStallPage
-          token={token}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "vendor-products" && token && (
-        <VendorProducts
-          token={token}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "vendor-orders" && token && (
-        <VendorOrders
-          token={token}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "vendor-revenue" && token && (
-        <VendorRevenue
-          token={token}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        />
-      )}
-
-      {view === "vendor-profile" && token && userId && (
-        <VendorProfile
-          token={token}
-          userId={userId}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-          onProfileUpdate={handleProfileUpdate}
-        />
-      )}
-    </div>
-  );
+  return renderPage();
 }
-
-export default App;

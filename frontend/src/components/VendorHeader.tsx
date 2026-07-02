@@ -7,9 +7,10 @@ interface VendorHeaderProps {
   token?: string | null;
   stallName?: string;
   onLogout?: () => void;
+  currentPage?: string;
 }
 
-export function VendorHeader({ onNavigate, token, stallName, onLogout }: VendorHeaderProps) {
+export function VendorHeader({ onNavigate, token, stallName, onLogout, currentPage = "vendor-stall" }: VendorHeaderProps) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogoutClick = () => setShowLogoutModal(true);
@@ -19,10 +20,16 @@ export function VendorHeader({ onNavigate, token, stallName, onLogout }: VendorH
   };
   const handleCancelLogout = () => setShowLogoutModal(false);
 
+  const navLinks = [
+    { id: "vendor-stall", label: "My Stall", icon: "fa-store" },
+    { id: "vendor-products", label: "Products", icon: "fa-utensils" },
+    { id: "vendor-orders", label: "Orders", icon: "fa-clipboard-list" },
+    { id: "vendor-revenue", label: "Revenue", icon: "fa-chart-line" },
+  ];
+
   return (
     <>
       <nav className="lp-nav vendor-nav">
-        {/* Left: Logo + Brand */}
         <div
           className="lp-nav-brand"
           onClick={() => onNavigate("vendor-stall")}
@@ -35,31 +42,19 @@ export function VendorHeader({ onNavigate, token, stallName, onLogout }: VendorH
           )}
         </div>
 
-        {/* Center: Vendor Nav Links */}
         <ul className="lp-nav-links">
-          <li>
-            <button onClick={() => onNavigate("vendor-stall")} className="lp-nav-link">
-              <i className="fas fa-store"></i> My Stall
-            </button>
-          </li>
-          <li>
-            <button onClick={() => onNavigate("vendor-products")} className="lp-nav-link">
-              <i className="fas fa-utensils"></i> Products
-            </button>
-          </li>
-          <li>
-            <button onClick={() => onNavigate("vendor-orders")} className="lp-nav-link">
-              <i className="fas fa-clipboard-list"></i> Orders
-            </button>
-          </li>
-          <li>
-            <button onClick={() => onNavigate("vendor-revenue")} className="lp-nav-link">
-              <i className="fas fa-chart-line"></i> Revenue
-            </button>
-          </li>
+          {navLinks.map((link) => (
+            <li key={link.id}>
+              <button
+                onClick={() => onNavigate(link.id)}
+                className={`lp-nav-link ${currentPage === link.id ? "active" : ""}`}
+              >
+                <i className={`fas ${link.icon}`}></i> {link.label}
+              </button>
+            </li>
+          ))}
         </ul>
 
-        {/* Right: Icons + Account */}
         <div className="lp-nav-right">
           <button
             className="lp-icon-btn"
@@ -75,7 +70,6 @@ export function VendorHeader({ onNavigate, token, stallName, onLogout }: VendorH
         </div>
       </nav>
 
-      {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="modal-overlay" onClick={handleCancelLogout}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

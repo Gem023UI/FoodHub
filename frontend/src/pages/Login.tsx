@@ -1,31 +1,63 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { loginUser, registerStudent, registerVendor, verifyEmail, resendVerification } from "../lib/api";
-import { getAvailableStalls } from "../lib/api";
+import { loginUser, registerStudent, verifyEmail, resendVerification } from "../services/auth.service";
 import tupLogo from "../../images/Logo.png";
 import "../styles/Login.css";
 
-// TUP Taguig courses
+// TUP Taguig courses - matching backend enum values
 const TUP_COURSES = [
-  "BS in Computer Science",
-  "BS in Information Technology",
-  "BS in Electronics Engineering",
-  "BS in Electrical Engineering",
-  "BS in Mechanical Engineering",
-  "BS in Civil Engineering",
-  "BS in Industrial Engineering",
-  "BS in Architecture",
-  "BS in Accountancy",
-  "BS in Business Administration",
-  "BS in Hospitality Management",
-  "BS in Tourism Management",
-  "BS in Entrepreneurship",
-  "BS in Office Administration",
-  "Associate in Computer Technology",
-  "Associate in Electrical Technology",
-  "Associate in Mechanical Technology",
+  "BSIT",
+  "BSCS", 
+  "BSIS",
+  "BSBA",
+  "BSHM",
+  "BSEd",
+  "BEED",
+  "BSN",
+  "BSPSYCH",
+  "BSCRIM",
+  "BSECE",
+  "BSEE",
+  "BSME",
+  "BSCE",
+  "BSIE",
+  "BSArch",
+  "BSA",
+  "BSTM",
+  "BSEntrep",
+  "BSOA",
+  "ACT",
+  "AET",
+  "AMT"
 ];
+
+// Course name mapping for display
+const COURSE_DISPLAY_NAMES: Record<string, string> = {
+  "BSIT": "BS in Information Technology",
+  "BSCS": "BS in Computer Science",
+  "BSIS": "BS in Information Systems",
+  "BSBA": "BS in Business Administration",
+  "BSHM": "BS in Hospitality Management",
+  "BSEd": "BS in Education",
+  "BEED": "Bachelor of Elementary Education",
+  "BSN": "BS in Nursing",
+  "BSPSYCH": "BS in Psychology",
+  "BSCRIM": "BS in Criminology",
+  "BSECE": "BS in Electronics Engineering",
+  "BSEE": "BS in Electrical Engineering",
+  "BSME": "BS in Mechanical Engineering",
+  "BSCE": "BS in Civil Engineering",
+  "BSIE": "BS in Industrial Engineering",
+  "BSArch": "BS in Architecture",
+  "BSA": "BS in Accountancy",
+  "BSTM": "BS in Tourism Management",
+  "BSEntrep": "BS in Entrepreneurship",
+  "BSOA": "BS in Office Administration",
+  "ACT": "Associate in Computer Technology",
+  "AET": "Associate in Electrical Technology",
+  "AMT": "Associate in Mechanical Technology"
+};
 
 interface LoginProps {
   onLogin: (
@@ -40,13 +72,11 @@ interface LoginProps {
 }
 
 type AuthMode = "login" | "register";
-type RegisterRole = "student" | "vendor";
 type VerifyState = "idle" | "pending" | "verified";
 
 export function Login({ onLogin, onNavigate }: LoginProps) {
   // ── mode ──
   const [mode, setMode] = useState<AuthMode>("login");
-  const [registerRole, setRegisterRole] = useState<RegisterRole>("student");
 
   // ── shared fields ──
   const [email, setEmail] = useState("");
@@ -67,17 +97,6 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
   const [section, setSection] = useState("");
   const [contactNumber, setContactNumber] = useState("");
 
-  // ── vendor fields ──
-  const [vFirstName, setVFirstName] = useState("");
-  const [vLastName, setVLastName] = useState("");
-  const [vContactNumber, setVContactNumber] = useState("");
-  const [proofFile, setProofFile] = useState<File | null>(null);
-
-  // ── stall fields ──
-  const [stallId, setStallId] = useState("");
-  const [availableStalls, setAvailableStalls] = useState<Array<{_id: string, name: string, location: string}>>([]);
-  const [isLoadingStalls, setIsLoadingStalls] = useState(false);
-
   // ── email verification ──
   const [verifyState, setVerifyState] = useState<VerifyState>("idle");
   const [verifyInput, setVerifyInput] = useState("");
@@ -85,32 +104,12 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
   const [isResending, setIsResending] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
 
-  useEffect(() => {
-    if (registerRole === "vendor" && mode === "register" && verifyState === "idle") {
-      fetchAvailableStalls();
-    }
-  }, [registerRole, mode, verifyState]);
-
-  async function fetchAvailableStalls() {
-    setIsLoadingStalls(true);
-    try {
-      const stalls = await getAvailableStalls();
-      setAvailableStalls(stalls);
-    } catch (err) {
-      console.error("Error fetching stalls:", err);
-      setError("Failed to load available stalls. Please refresh and try again.");
-    } finally {
-      setIsLoadingStalls(false);
-    }
-  }
-
   function switchMode(m: AuthMode) {
     setMode(m);
     setError(null);
     setSuccessMsg(null);
     setVerifyState("idle");
     setVerifyInput("");
-    setStallId("");
   }
 
   function getNetworkError(): string {
@@ -125,7 +124,7 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
 
     try {
       const result = await loginUser(email, password);
-      
+
       onLogin(
         result.accessToken,
         result.user.id,
@@ -141,74 +140,45 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
     }
   }
 
-  // ── REGISTER ──
+  // ── REGISTER (student only) ──
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
     // Validate TUPT-ID format for students
-    if (registerRole === "student") {
-      const tuptPattern = /^TUPT-\d{2}-\d{4}$/i;
-      if (!tuptPattern.test(tuptId)) {
-        setError("TUPT ID must follow the format TUPT-XX-XXXX (e.g. TUPT-21-1234).");
-        setIsLoading(false);
-        return;
-      }
+    const tuptPattern = /^TUPT-\d{2}-\d{4}$/i;
+    if (!tuptPattern.test(tuptId)) {
+      setError("TUPT ID must follow the format TUPT-XX-XXXX (e.g. TUPT-21-1234).");
+      setIsLoading(false);
+      return;
     }
 
-    // Validate vendor stall selection
-    if (registerRole === "vendor" && !stallId) {
-      setError("Please select a stall.");
+    // Validate course selection
+    if (!course) {
+      setError("Please select a course.");
       setIsLoading(false);
       return;
     }
 
     try {
-      let proofOfLegitimacyUrl: string | undefined;
-
-      // Upload proof of legitimacy to Cloudinary for vendors
-      if (registerRole === "vendor" && proofFile) {
-        const formData = new FormData();
-        formData.append("proof", proofFile);
-        const uploadRes = await fetch("/api/users/vendor-proof-upload", {
-          method: "POST",
-          body: formData,
-        });
-        if (!uploadRes.ok) throw new Error("Failed to upload proof of legitimacy.");
-        const uploadData = await uploadRes.json() as { url: string };
-        proofOfLegitimacyUrl = uploadData.url;
-      }
-
-      if (registerRole === "student") {
-        await registerStudent({
-          firstName,
-          lastName,
-          birthday,
-          email,
-          tuptId: tuptId.toUpperCase(),
-          course,
-          section,
-          contactNumber,
-          password,
-        });
-      } else {
-        await registerVendor({
-          firstName: vFirstName,
-          lastName: vLastName,
-          email,
-          password,
-          contactNumber: vContactNumber,
-          proofOfLegitimacyUrl,
-          stallId,
-        });
-      }
+      await registerStudent({
+        firstName,
+        lastName,
+        birthdate: birthday,
+        email,
+        tuptId: tuptId.toUpperCase(),
+        course, // This should be the short code like "BSIT"
+        section,
+        contactNumber,
+        password,
+      });
 
       setRegisteredEmail(email);
       setVerifyState("pending");
       setSuccessMsg("Verification code sent to your email! Please check your inbox.");
       setError(null);
-      
+
       if (import.meta.env.DEV) {
         console.log("📧 [DEV] Check your email for the verification code.");
       }
@@ -224,13 +194,13 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    
+
     try {
       await verifyEmail(registeredEmail, verifyInput.trim());
       setVerifyState("verified");
       setSuccessMsg("Email verified! Your account is now active. Please log in.");
       setError(null);
-      
+
       setTimeout(() => {
         switchMode("login");
       }, 2000);
@@ -244,15 +214,15 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
   // ── RESEND VERIFICATION CODE ──
   async function handleResendVerification() {
     if (resendCooldown > 0 || isResending) return;
-    
+
     setError(null);
     setIsResending(true);
-    
+
     try {
-      const result = await resendVerification(registeredEmail);
+      await resendVerification(registeredEmail);
       setSuccessMsg("New verification code sent to your email!");
       setError(null);
-      
+
       setResendCooldown(60);
       const interval = setInterval(() => {
         setResendCooldown((prev) => {
@@ -263,7 +233,7 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
           return prev - 1;
         });
       }, 1000);
-      
+
       if (import.meta.env.DEV) {
         console.log("📧 [DEV] New verification code sent.");
       }
@@ -370,324 +340,161 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
 
           {mode === "register" && verifyState === "idle" && (
             <form className="auth-form" onSubmit={handleRegister}>
-              <div className="auth-role-selector">
-                <button
-                  type="button"
-                  className={`auth-role-btn ${registerRole === "student" ? "selected" : ""}`}
-                  onClick={() => setRegisterRole("student")}
-                >
-                  <i className="fas fa-graduation-cap"></i>
-                  Student
-                </button>
-                <button
-                  type="button"
-                  className={`auth-role-btn ${registerRole === "vendor" ? "selected" : ""}`}
-                  onClick={() => setRegisterRole("vendor")}
-                >
-                  <i className="fas fa-store"></i>
-                  Vendor
-                </button>
+              <div className="auth-section-label">Personal info</div>
+              <div className="auth-field-row">
+                <div className="auth-field">
+                  <label>First name</label>
+                  <div className="auth-input-wrap">
+                    <i className="fas fa-user field-icon"></i>
+                    <input
+                      type="text"
+                      placeholder="Juan"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      disabled={isLoading}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="auth-field">
+                  <label>Last name</label>
+                  <div className="auth-input-wrap">
+                    <i className="fas fa-user field-icon"></i>
+                    <input
+                      type="text"
+                      placeholder="dela Cruz"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      disabled={isLoading}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
 
-              {registerRole === "student" && (
-                <>
-                  <div className="auth-section-label">Personal info</div>
-                  <div className="auth-field-row">
-                    <div className="auth-field">
-                      <label>First name</label>
-                      <div className="auth-input-wrap">
-                        <i className="fas fa-user field-icon"></i>
-                        <input
-                          type="text"
-                          placeholder="Juan"
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                          disabled={isLoading}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="auth-field">
-                      <label>Last name</label>
-                      <div className="auth-input-wrap">
-                        <i className="fas fa-user field-icon"></i>
-                        <input
-                          type="text"
-                          placeholder="dela Cruz"
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          disabled={isLoading}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
+              <div className="auth-field">
+                <label>Birthday</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-calendar field-icon"></i>
+                  <input
+                    type="date"
+                    value={birthday}
+                    onChange={(e) => setBirthday(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="auth-field">
-                    <label>Birthday</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-calendar field-icon"></i>
-                      <input
-                        type="date"
-                        value={birthday}
-                        onChange={(e) => setBirthday(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                  </div>
+              <div className="auth-section-label">Academic info</div>
 
-                  <div className="auth-section-label">Academic info</div>
+              <div className="auth-field">
+                <label>TUPT ID</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-id-card field-icon"></i>
+                  <input
+                    type="text"
+                    placeholder="TUPT-21-1234"
+                    value={tuptId}
+                    onChange={(e) => setTuptId(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    pattern="TUPT-\d{2}-\d{4}"
+                    title="Format: TUPT-XX-XXXX"
+                  />
+                </div>
+              </div>
 
-                  <div className="auth-field">
-                    <label>TUPT ID</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-id-card field-icon"></i>
-                      <input
-                        type="text"
-                        placeholder="TUPT-21-1234"
-                        value={tuptId}
-                        onChange={(e) => setTuptId(e.target.value)}
-                        disabled={isLoading}
-                        required
-                        pattern="TUPT-\d{2}-\d{4}"
-                        title="Format: TUPT-XX-XXXX"
-                      />
-                    </div>
-                  </div>
+              <div className="auth-field">
+                <label>Course</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-book field-icon"></i>
+                  <select
+                    value={course}
+                    onChange={(e) => setCourse(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  >
+                    <option value="">Select course…</option>
+                    {TUP_COURSES.map((c) => (
+                      <option key={c} value={c}>
+                        {COURSE_DISPLAY_NAMES[c] || c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                  <div className="auth-field">
-                    <label>Course</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-book field-icon"></i>
-                      <select
-                        value={course}
-                        onChange={(e) => setCourse(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      >
-                        <option value="">Select course…</option>
-                        {TUP_COURSES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+              <div className="auth-field">
+                <label>Section</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-users field-icon"></i>
+                  <input
+                    type="text"
+                    placeholder="e.g. 3A"
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="auth-field">
-                    <label>Section</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-users field-icon"></i>
-                      <input
-                        type="text"
-                        placeholder="e.g. 3A"
-                        value={section}
-                        onChange={(e) => setSection(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                  </div>
+              <div className="auth-section-label">Contact & access</div>
 
-                  <div className="auth-section-label">Contact & access</div>
+              <div className="auth-field">
+                <label>Contact number</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-phone field-icon"></i>
+                  <input
+                    type="tel"
+                    placeholder="09XXXXXXXXX"
+                    value={contactNumber}
+                    onChange={(e) => setContactNumber(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="auth-field">
-                    <label>Contact number</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-phone field-icon"></i>
-                      <input
-                        type="tel"
-                        placeholder="09XXXXXXXXX"
-                        value={contactNumber}
-                        onChange={(e) => setContactNumber(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                  </div>
+              <div className="auth-field">
+                <label>Email address</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-envelope field-icon"></i>
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
 
-                  <div className="auth-field">
-                    <label>Email address</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-envelope field-icon"></i>
-                      <input
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="auth-field">
-                    <label>Password</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-lock field-icon"></i>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Create a strong password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                        required
-                        minLength={8}
-                      />
-                      <button
-                        type="button"
-                        className="auth-eye-btn"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {registerRole === "vendor" && (
-                <>
-                  <div className="auth-section-label">Personal info</div>
-
-                  <div className="auth-field-row">
-                    <div className="auth-field">
-                      <label>First name</label>
-                      <div className="auth-input-wrap">
-                        <i className="fas fa-user field-icon"></i>
-                        <input
-                          type="text"
-                          placeholder="Maria"
-                          value={vFirstName}
-                          onChange={(e) => setVFirstName(e.target.value)}
-                          disabled={isLoading}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="auth-field">
-                      <label>Last name</label>
-                      <div className="auth-input-wrap">
-                        <i className="fas fa-user field-icon"></i>
-                        <input
-                          type="text"
-                          placeholder="Santos"
-                          value={vLastName}
-                          onChange={(e) => setVLastName(e.target.value)}
-                          disabled={isLoading}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="auth-field">
-                    <label>Contact number</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-phone field-icon"></i>
-                      <input
-                        type="tel"
-                        placeholder="09XXXXXXXXX"
-                        value={vContactNumber}
-                        onChange={(e) => setVContactNumber(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="auth-section-label">Business verification</div>
-
-                  <div className="auth-field">
-                    <label>Proof of legitimacy (photo)</label>
-                    <label className="auth-file-label">
-                      <i className="fas fa-cloud-arrow-up"></i>
-                      <span>{proofFile ? "Change photo" : "Upload business permit / ID"}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </label>
-                    {proofFile && (
-                      <span className="auth-file-name">
-                        <i className="fas fa-image" style={{ marginRight: 4 }}></i>
-                        {proofFile.name}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="auth-section-label">Stall Assignment</div>
-                  
-                  <div className="auth-field">
-                    <label>Select your stall</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-store field-icon"></i>
-                      <select
-                        value={stallId}
-                        onChange={(e) => setStallId(e.target.value)}
-                        disabled={isLoading || isLoadingStalls}
-                        required
-                      >
-                        <option value="">Select a stall…</option>
-                        {availableStalls.map((stall) => (
-                          <option key={stall._id} value={stall._id}>
-                            {stall.name} - {stall.location}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {isLoadingStalls && <span style={{ fontSize: 12, color: '#666' }}>Loading stalls...</span>}
-                    {availableStalls.length === 0 && !isLoadingStalls && (
-                      <span style={{ fontSize: 12, color: '#ff3131' }}>No stalls available. Please contact admin.</span>
-                    )}
-                  </div>
-
-                  <div className="auth-section-label">Contact & access</div>
-
-                  <div className="auth-field">
-                    <label>Email address</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-envelope field-icon"></i>
-                      <input
-                        type="email"
-                        placeholder="stall@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="auth-field">
-                    <label>Password</label>
-                    <div className="auth-input-wrap">
-                      <i className="fas fa-lock field-icon"></i>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Create a strong password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                        required
-                        minLength={8}
-                      />
-                      <button
-                        type="button"
-                        className="auth-eye-btn"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+              <div className="auth-field">
+                <label>Password</label>
+                <div className="auth-input-wrap">
+                  <i className="fas fa-lock field-icon"></i>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a strong password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    className="auth-eye-btn"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
+                  </button>
+                </div>
+              </div>
 
               <button type="submit" className="auth-submit-btn" disabled={isLoading}>
                 {isLoading ? "Registering…" : "Create Account"}

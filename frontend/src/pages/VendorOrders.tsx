@@ -2,16 +2,7 @@ import { useState, useEffect } from "react";
 import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getVendorOrders, updateOrderStatus } from "../lib/api";
 import "../styles/VendorOrders.css";
-
-interface OrderItem {
-  productId: string;
-  productName: string;
-  price: number;
-  quantity: number;
-  subtotal: number;
-}
 
 interface Order {
   _id: string;
@@ -23,14 +14,24 @@ interface Order {
     tuptId: string;
     course: string;
     section: string;
+    profilePictureUrl: string | null;
   };
-  orderLines: OrderItem[];
+  orderLines: Array<{
+    productId: string;
+    productName: string;
+    price: number;
+    quantity: number;
+    subtotal: number;
+  }>;
   totalAmount: number;
-  paymentMethod: "Cash" | "GCash" | "Maya";
-  gcashNumber: string | null;
+  paymentMethod: "cash" | "gcash" | "paymaya";
   pickupTime: string;
-  orderStatus: "Pending" | "Preparing" | "Ready" | "Completed" | "Cancelled";
-  paymentStatus: "Unpaid" | "Paid" | "Failed" | "Refunded";
+  orderStatus: "pending" | "preparing" | "ready" | "completed" | "cancelled";
+  paymentRecord: {
+    status: "pending" | "paid" | "refunded";
+    paymentMethod: string;
+    paymentReference: string;
+  };
   createdAt: string;
 }
 
@@ -40,7 +41,7 @@ interface VendorOrdersProps {
   onLogout?: () => void;
 }
 
-type TabType = "pending" | "paid" | "all";
+type TabType = "pending" | "preparing" | "ready" | "completed" | "all";
 
 export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -48,16 +49,22 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [stallId, setStallId] = useState<string | null>(null);
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [token]);
 
   async function loadOrders() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getVendorOrders(token);
+      // Get stall first
+      const stall = await getVendorStall(token);
+      setStallId(stall._id);
+      
+      // Get orders for the stall
+      const data = await getStallOrders(token, stall._id);
       setOrders(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load orders");
@@ -68,9 +75,9 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
 
   async function handleStatusUpdate(orderId: string, status: Order["orderStatus"]) {
     setUpdatingOrderId(orderId);
+    setError(null);
     try {
       await updateOrderStatus(token, orderId, status);
-      // Refresh orders
       await loadOrders();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update order status");
@@ -79,48 +86,65 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
     }
   }
 
+  async function handlePaymentRefund(orderId: string) {
+    setUpdatingOrderId(orderId);
+    setError(null);
+    try {
+      await updatePaymentStatus(token, orderId, "refunded");
+      await loadOrders();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refund payment");
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  }
+
   const filteredOrders = orders.filter(order => {
-    if (activeTab === "pending") {
-      return order.paymentStatus === "Paid" && 
-        ["Pending", "Preparing", "Ready"].includes(order.orderStatus);
-    }
-    if (activeTab === "paid") {
-      return order.paymentStatus === "Paid" && 
-        ["Completed"].includes(order.orderStatus);
-    }
-    return true;
+    if (activeTab === "all") return true;
+    return order.orderStatus === activeTab;
   });
 
   const getStatusColor = (status: Order["orderStatus"]) => {
     switch (status) {
-      case "Pending": return "status-pending";
-      case "Preparing": return "status-preparing";
-      case "Ready": return "status-ready";
-      case "Completed": return "status-completed";
-      case "Cancelled": return "status-cancelled";
+      case "pending": return "status-pending";
+      case "preparing": return "status-preparing";
+      case "ready": return "status-ready";
+      case "completed": return "status-completed";
+      case "cancelled": return "status-cancelled";
       default: return "";
     }
   };
 
-  const getPaymentStatusColor = (status: Order["paymentStatus"]) => {
+  const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case "Paid": return "payment-paid";
-      case "Unpaid": return "payment-unpaid";
-      case "Failed": return "payment-failed";
-      case "Refunded": return "payment-refunded";
+      case "paid": return "payment-paid";
+      case "pending": return "payment-unpaid";
+      case "refunded": return "payment-refunded";
       default: return "";
     }
   };
 
   const getNextStatus = (current: Order["orderStatus"]): Order["orderStatus"] | null => {
     const flow: Record<Order["orderStatus"], Order["orderStatus"] | null> = {
-      "Pending": "Preparing",
-      "Preparing": "Ready",
-      "Ready": "Completed",
-      "Completed": null,
-      "Cancelled": null
+      "pending": "preparing",
+      "preparing": "ready",
+      "ready": "completed",
+      "completed": null,
+      "cancelled": null
     };
     return flow[current] || null;
+  };
+
+  const getStatusLabel = (status: Order["orderStatus"]) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const tabCounts = {
+    pending: orders.filter(o => o.orderStatus === "pending").length,
+    preparing: orders.filter(o => o.orderStatus === "preparing").length,
+    ready: orders.filter(o => o.orderStatus === "ready").length,
+    completed: orders.filter(o => o.orderStatus === "completed").length,
+    all: orders.length
   };
 
   if (isLoading) {
@@ -154,29 +178,36 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
             className={`tab-btn ${activeTab === "pending" ? "active" : ""}`}
             onClick={() => setActiveTab("pending")}
           >
-            Pending Orders
-            <span className="tab-count">
-              {orders.filter(o => 
-                o.paymentStatus === "Paid" && 
-                ["Pending", "Preparing", "Ready"].includes(o.orderStatus)
-              ).length}
-            </span>
+            Pending
+            <span className="tab-count">{tabCounts.pending}</span>
           </button>
           <button
-            className={`tab-btn ${activeTab === "paid" ? "active" : ""}`}
-            onClick={() => setActiveTab("paid")}
+            className={`tab-btn ${activeTab === "preparing" ? "active" : ""}`}
+            onClick={() => setActiveTab("preparing")}
           >
-            Completed Orders
-            <span className="tab-count">
-              {orders.filter(o => o.orderStatus === "Completed").length}
-            </span>
+            Preparing
+            <span className="tab-count">{tabCounts.preparing}</span>
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "ready" ? "active" : ""}`}
+            onClick={() => setActiveTab("ready")}
+          >
+            Ready
+            <span className="tab-count">{tabCounts.ready}</span>
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "completed" ? "active" : ""}`}
+            onClick={() => setActiveTab("completed")}
+          >
+            Completed
+            <span className="tab-count">{tabCounts.completed}</span>
           </button>
           <button
             className={`tab-btn ${activeTab === "all" ? "active" : ""}`}
             onClick={() => setActiveTab("all")}
           >
-            All Orders
-            <span className="tab-count">{orders.length}</span>
+            All
+            <span className="tab-count">{tabCounts.all}</span>
           </button>
         </div>
 
@@ -198,7 +229,7 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
                   <th>Payment</th>
                   <th>Status</th>
                   <th>Pickup</th>
-                  <th>Action</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -221,6 +252,7 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
                           <div key={index} className="order-item-line">
                             <span>{item.productName}</span>
                             <span>×{item.quantity}</span>
+                            <span>₱{item.subtotal.toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
@@ -230,24 +262,23 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
                     </td>
                     <td>
                       <div className="payment-info">
-                        <span className="payment-method">{order.paymentMethod}</span>
-                        <span className={`payment-status ${getPaymentStatusColor(order.paymentStatus)}`}>
-                          {order.paymentStatus}
+                        <span className="payment-method">
+                          {order.paymentMethod.charAt(0).toUpperCase() + order.paymentMethod.slice(1)}
                         </span>
-                        {order.gcashNumber && (
-                          <span className="gcash-number">{order.gcashNumber}</span>
-                        )}
+                        <span className={`payment-status ${getPaymentStatusColor(order.paymentRecord?.status || "pending")}`}>
+                          {order.paymentRecord?.status || "Pending"}
+                        </span>
                       </div>
                     </td>
                     <td>
                       <span className={`order-status-badge ${getStatusColor(order.orderStatus)}`}>
-                        {order.orderStatus}
+                        {getStatusLabel(order.orderStatus)}
                       </span>
                     </td>
                     <td className="pickup-time">{order.pickupTime}</td>
                     <td>
                       <div className="action-buttons">
-                        {order.paymentStatus === "Paid" && order.orderStatus !== "Completed" && order.orderStatus !== "Cancelled" && (
+                        {order.orderStatus !== "completed" && order.orderStatus !== "cancelled" && (
                           <>
                             {getNextStatus(order.orderStatus) && (
                               <button
@@ -258,19 +289,28 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
                                 {updatingOrderId === order._id ? (
                                   <i className="fas fa-spinner fa-spin"></i>
                                 ) : (
-                                  `Mark ${getNextStatus(order.orderStatus)}`
+                                  `Mark ${getStatusLabel(getNextStatus(order.orderStatus)!)}`
                                 )}
+                              </button>
+                            )}
+                            {order.orderStatus === "pending" && (
+                              <button
+                                className="status-update-btn cancel"
+                                onClick={() => handleStatusUpdate(order._id, "cancelled")}
+                                disabled={updatingOrderId === order._id}
+                              >
+                                Cancel
                               </button>
                             )}
                           </>
                         )}
-                        {order.orderStatus !== "Cancelled" && order.orderStatus !== "Completed" && (
+                        {order.paymentRecord?.status === "paid" && order.orderStatus === "completed" && (
                           <button
                             className="status-update-btn cancel"
-                            onClick={() => handleStatusUpdate(order._id, "Cancelled")}
+                            onClick={() => handlePaymentRefund(order._id)}
                             disabled={updatingOrderId === order._id}
                           >
-                            Cancel
+                            Refund
                           </button>
                         )}
                       </div>

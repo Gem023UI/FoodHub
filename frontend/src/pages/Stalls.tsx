@@ -2,37 +2,31 @@ import { useState, useEffect } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getStalls, getStallById } from "../lib/api";
+import { getStalls, getStallDetails, getStallProductsByCategory } from "../services/stall.service";
 import tupLogo from "../../images/Logo.png";
 import "../styles/Stalls.css";
 
 interface StallsPageProps {
   token?: string;
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, data?: any) => void;
   stallId?: string;
 }
 
-const SECTIONS = [
-  { id: "A", name: "Section A", color: "#ff3131" },
-  { id: "B", name: "Section B", color: "#ff751f" },
-  { id: "C", name: "Section C", color: "#ffde59" },
-  { id: "D", name: "Section D", color: "#4ecdc4" },
-  { id: "E", name: "Section E", color: "#45b7d1" },
-  { id: "F", name: "Section F", color: "#764ba2" },
-];
+const SECTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+const PRODUCT_CATEGORIES = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
 
 export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
   const [stalls, setStalls] = useState<any[]>([]);
   const [selectedStall, setSelectedStall] = useState<any>(null);
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [stallProducts, setStallProducts] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
     loadStalls();
   }, []);
 
-  // If stallId is provided, load that stall
   useEffect(() => {
     if (stallId && stalls.length > 0) {
       const stall = stalls.find(s => s._id === stallId);
@@ -46,19 +40,17 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
     setIsLoading(true);
     try {
       const data = await getStalls();
-      setStalls(data.filter(s => s.isActive));
+      const activeStalls = data.filter(s => s.status === true);
+      setStalls(activeStalls);
       
-      // Load products for each stall
       const productMap: Record<string, any[]> = {};
-      for (const stall of data) {
-        if (stall.isActive) {
-          try {
-            const result = await getStallById(stall._id);
-            productMap[stall._id] = result.products || [];
-          } catch (err) {
-            console.error(`Error loading products for ${stall.name}:`, err);
-            productMap[stall._id] = [];
-          }
+      for (const stall of activeStalls) {
+        try {
+          const details = await getStallDetails(stall._id);
+          productMap[stall._id] = details.products || [];
+        } catch (err) {
+          console.error(`Error loading products for ${stall.stallName}:`, err);
+          productMap[stall._id] = [];
         }
       }
       setStallProducts(productMap);
@@ -69,18 +61,42 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
     }
   }
 
-  const handleStallSelect = (stall: any) => {
+  const handleStallSelect = async (stall: any) => {
     setSelectedStall(stall);
-    setSelectedProducts(stallProducts[stall._id] || []);
+    setSelectedCategory("All");
+    
+    try {
+      const details = await getStallDetails(stall._id);
+      setSelectedProducts(details.products || []);
+      setStallProducts(prev => ({
+        ...prev,
+        [stall._id]: details.products || []
+      }));
+    } catch (err) {
+      console.error("Error loading stall details:", err);
+      setSelectedProducts([]);
+    }
   };
 
-  // Group stalls by section
+  const handleCategoryFilter = async (category: string) => {
+    setSelectedCategory(category);
+    if (!selectedStall) return;
+    
+    if (category === "All") {
+      const details = await getStallDetails(selectedStall._id);
+      setSelectedProducts(details.products || []);
+    } else {
+      const products = await getStallProductsByCategory(selectedStall._id, category);
+      setSelectedProducts(products);
+    }
+  };
+
   const stallsBySection = stalls.reduce((acc, stall) => {
-    const section = stall.section || "A";
+    const section = stall.section || 1;
     if (!acc[section]) acc[section] = [];
     acc[section].push(stall);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<number, any[]>);
 
   if (isLoading) {
     return (
@@ -104,17 +120,17 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
 
         {/* Map Grid */}
         <div className="stalls-map">
-          {SECTIONS.map((section) => {
-            const sectionStalls = stallsBySection[section.id] || [];
+          {SECTIONS.map((sectionNum) => {
+            const sectionStalls = stallsBySection[sectionNum] || [];
             const hasStalls = sectionStalls.length > 0;
 
             return (
               <div
-                key={section.id}
+                key={sectionNum}
                 className={`stalls-map-section ${hasStalls ? "has-stalls" : "empty"}`}
                 style={{ 
-                  backgroundColor: hasStalls ? `${section.color}22` : "#f5f5f5",
-                  borderColor: section.color 
+                  backgroundColor: hasStalls ? `#ff313122` : "#f5f5f5",
+                  borderColor: "#ff3131" 
                 }}
                 onClick={() => {
                   if (hasStalls && sectionStalls.length === 1) {
@@ -124,8 +140,8 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
                   }
                 }}
               >
-                <div className="section-label" style={{ color: section.color }}>
-                  {section.name}
+                <div className="section-label" style={{ color: "#ff3131" }}>
+                  Section {sectionNum}
                 </div>
                 {hasStalls ? (
                   <div className="section-stalls">
@@ -138,7 +154,7 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
                           handleStallSelect(stall);
                         }}
                       >
-                        {stall.name}
+                        {stall.stallName}
                       </div>
                     ))}
                     {sectionStalls.length > 3 && (
@@ -157,7 +173,7 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
         {selectedStall && (
           <div className="stall-details">
             <div className="stall-details-header">
-              <h2>{selectedStall.name}</h2>
+              <h2>{selectedStall.stallName}</h2>
               <button 
                 className="stall-details-close" 
                 onClick={() => setSelectedStall(null)}
@@ -167,20 +183,43 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
             </div>
             
             <div className="stall-details-info">
-              <p><strong>Location:</strong> {selectedStall.location}</p>
-              <p><strong>Category:</strong> {selectedStall.category || "General"}</p>
-              <p><strong>Hours:</strong> {selectedStall.openingHours || "Not specified"}</p>
-              {selectedStall.description && (
-                <p><strong>Description:</strong> {selectedStall.description}</p>
+              <p><strong>Section:</strong> {selectedStall.section}</p>
+              <p><strong>Hours:</strong> {selectedStall.openHours?.openTime} - {selectedStall.openHours?.closingTime}</p>
+              {selectedStall.stallDescription && (
+                <p><strong>Description:</strong> {selectedStall.stallDescription}</p>
               )}
-              {selectedStall.paymentMethods && selectedStall.paymentMethods.length > 0 && (
-                <p><strong>Payment Methods:</strong> {selectedStall.paymentMethods.join(", ")}</p>
+              {selectedStall.isInOperation !== undefined && (
+                <p>
+                  <strong>Status:</strong> 
+                  <span className={selectedStall.isInOperation ? "status-open" : "status-closed"}>
+                    {selectedStall.isInOperation ? " In Operation" : " Closed"}
+                  </span>
+                </p>
               )}
+            </div>
+
+            {/* Category Filters */}
+            <div className="category-filters">
+              <button
+                className={`category-chip ${selectedCategory === "All" ? "active" : ""}`}
+                onClick={() => handleCategoryFilter("All")}
+              >
+                All
+              </button>
+              {PRODUCT_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  className={`category-chip ${selectedCategory === cat ? "active" : ""}`}
+                  onClick={() => handleCategoryFilter(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
 
             {selectedProducts.length > 0 && (
               <div className="stall-products">
-                <h3>Menu Items</h3>
+                <h3>Menu Items ({selectedProducts.length})</h3>
                 <div className="stall-products-grid">
                   {selectedProducts.map((product) => (
                     <div 
@@ -190,14 +229,14 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
                     >
                       <div className="product-item-image">
                         <img 
-                          src={product.photos?.[0] || "https://via.placeholder.com/100x100?text=No+Image"} 
-                          alt={product.name}
+                          src={product.productImages?.[0] || "https://via.placeholder.com/100x100?text=No+Image"} 
+                          alt={product.productName}
                         />
                       </div>
                       <div className="product-item-info">
-                        <h4>{product.name}</h4>
+                        <h4>{product.productName}</h4>
                         <p className="product-item-price">₱{product.price.toFixed(2)}</p>
-                        {product.isAvailable ? (
+                        {product.available ? (
                           <span className="product-item-available">Available</span>
                         ) : (
                           <span className="product-item-unavailable">Unavailable</span>
@@ -223,15 +262,15 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
               >
                 <div className="all-stall-image">
                   <img 
-                    src={stall.photos?.[0] || tupLogo} 
-                    alt={stall.name}
+                    src={stall.stallPicture || tupLogo} 
+                    alt={stall.stallName}
                   />
                 </div>
                 <div className="all-stall-info">
-                  <h3>{stall.name}</h3>
-                  <p>{stall.location}</p>
-                  <span className={`all-stall-status ${stall.isActive ? "active" : "inactive"}`}>
-                    {stall.isActive ? "Open" : "Closed"}
+                  <h3>{stall.stallName}</h3>
+                  <p>Section {stall.section}</p>
+                  <span className={`all-stall-status ${stall.status ? "active" : "inactive"}`}>
+                    {stall.status ? "Open" : "Closed"}
                   </span>
                 </div>
               </div>

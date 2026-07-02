@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { ProductCard } from "../components/ProductCard";
-import { getStalls, getProductsByStall } from "../lib/api";
+import { getStalls } from "../services/stall.service";
+import { getProductsByStall } from "../services/product.service";
 import tupLogo from "../../images/Logo.png";
 import "../styles/LandingPage.css";
 
@@ -35,10 +36,23 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [animating, setAnimating] = useState(false);
 
-    const heroImages = [
-        "https://res.cloudinary.com/dxnb2ozgw/image/upload/v1782545114/50105218-7d1d-4f2b-88ad-e8a74575f75a.png",
-        "https://res.cloudinary.com/dxnb2ozgw/image/upload/v1782545235/13fc304d-e2db-4d59-b425-85c35cc7b372.png",
-        "https://res.cloudinary.com/dxnb2ozgw/image/upload/v1782545270/c9ac2d07-9f6a-435c-af8a-c8fb47c8d6c5.png",
+        const heroImages = [
+        "/images/foods/beverage.png",
+        "/images/foods/burger.png",
+        "/images/foods/crispybite.png",
+        "/images/foods/donut.png",
+        "/images/foods/egg.png",
+        "/images/foods/fries.png",
+        "/images/foods/juice.png",
+        "/images/foods/lemonade.png",
+        "/images/foods/lemonade1.png",
+        "/images/foods/matcha.png",
+        "/images/foods/pizza.png",
+        "/images/foods/ricemeal.png",
+        "/images/foods/sandwich.png",
+        "/images/foods/snacks.png",
+        "/images/foods/soda.png",
+        "/images/foods/soda1.png",
     ];
 
     useEffect(() => {
@@ -65,14 +79,25 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
         setIsLoading(true);
         try {
             const stallData = await getStalls();
-            setStalls(stallData.filter(s => s.isActive));
+            // Filter stalls that are open (status === true)
+            const openStalls = stallData.filter(s => s.status === true);
+            setStalls(openStalls);
 
-            // Get all products from all stalls
+            // Get all products from open stalls
             const allProductsData: any[] = [];
-            for (const stall of stallData) {
-                if (stall.isActive) {
-                    const products = await getProductsByStall(stall._id);
-                    allProductsData.push(...products.filter(p => p.isAvailable));
+            for (const stall of openStalls) {
+                try {
+                    const products = await getProductsByStall(stall._id, { available: true });
+                    // Add stall info to each product
+                    const productsWithStall = products.map(p => ({
+                        ...p,
+                        stallId: stall._id,
+                        stallName: stall.stallName,
+                        stallPicture: stall.stallPicture
+                    }));
+                    allProductsData.push(...productsWithStall);
+                } catch (err) {
+                    console.error(`Error loading products for stall ${stall.stallName}:`, err);
                 }
             }
             setAllProducts(allProductsData);
@@ -91,9 +116,10 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase().trim();
             filtered = filtered.filter(p => 
-                p.name.toLowerCase().includes(query) ||
-                p.description?.toLowerCase().includes(query) ||
-                p.category?.toLowerCase().includes(query)
+                p.productName?.toLowerCase().includes(query) ||
+                p.productDescription?.toLowerCase().includes(query) ||
+                p.category?.toLowerCase().includes(query) ||
+                p.stallName?.toLowerCase().includes(query)
             );
         }
 
@@ -126,8 +152,6 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
             [type]: numValue
         }));
     }
-
-    const featuredProducts = filteredProducts.slice(0, 6);
 
     return (
         <div className="landing-page">
@@ -263,11 +287,12 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                 ) : (
                     <div className="lp-products-grid">
                         {filteredProducts.slice(0, 12).map((product) => (
-                          <ProductCard
-                            key={product._id}
-                            product={product}
-                            onClick={() => onNavigate(`product/${product._id}`)}
-                          />
+                            <ProductCard
+                                key={product._id}
+                                product={product}
+                                token={token || undefined}
+                                onClick={() => onNavigate(`product/${product._id}`)}
+                            />
                         ))}
                     </div>
                 )}
@@ -291,20 +316,24 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                             >
                                 <div className="lp-stall-img-wrap">
                                     <img 
-                                        src={stall.photos?.[0] || tupLogo} 
-                                        alt={stall.name} 
+                                        src={stall.stallPicture || tupLogo} 
+                                        alt={stall.stallName} 
                                         className="lp-stall-img" 
                                     />
+                                    {stall.status && (
+                                        <span className="lp-stall-badge">Open</span>
+                                    )}
                                 </div>
                                 <div className="lp-stall-info">
-                                    <h3 className="lp-stall-name">{stall.name}</h3>
-                                    <p className="lp-stall-tag">{stall.category || "General"}</p>
+                                    <h3 className="lp-stall-name">{stall.stallName}</h3>
+                                    <p className="lp-stall-tag">Section {stall.section}</p>
                                     <p className="lp-stall-location">
-                                        <i className="fas fa-map-marker-alt"></i> {stall.location}
+                                        <i className="fas fa-clock"></i> 
+                                        {stall.openHours?.openTime} - {stall.openHours?.closingTime || "Check hours"}
                                     </p>
                                     <div className="lp-stall-footer">
                                         <span className="lp-stall-price">
-                                            {stall.openingHours || "Check hours"}
+                                            {stall.products?.length || 0} items
                                         </span>
                                         <button
                                             className="lp-stall-order-btn"

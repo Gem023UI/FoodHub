@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getStallById } from "../lib/api";
+import { getStallDetails } from "../services/stall.service";
 import "../styles/Cart.css";
 
 interface CartItem {
@@ -10,10 +10,10 @@ interface CartItem {
   productName: string;
   price: number;
   quantity: number;
-  photos: string[];
+  productImages: string[];
   nutrition: {
     calories: number | null;
-    proteinGrams: number | null;
+    protein: number | null;
   };
   stallId: string;
   stallName: string;
@@ -23,6 +23,7 @@ interface CartItem {
 interface StallGroup {
   stallId: string;
   stallName: string;
+  stallPicture?: string | null;
   items: CartItem[];
   paymentMethods?: string[];
   paymentDetails?: {
@@ -55,7 +56,6 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
       if (savedCart) {
         const parsed = JSON.parse(savedCart);
         setCartItems(parsed);
-        // Group by stall
         groupByStall(parsed);
       }
     } catch (err) {
@@ -71,20 +71,29 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
     
     for (const item of items) {
       if (!groups[item.stallId]) {
-        // Fetch stall payment methods
         try {
-          const stall = await getStallById(item.stallId);
+          const stall = await getStallDetails(item.stallId);
+          const paymentMethods = [];
+          if (stall.paymentMethod?.cash?.available) paymentMethods.push("Cash");
+          if (stall.paymentMethod?.gcash?.available) paymentMethods.push("GCash");
+          if (stall.paymentMethod?.paymaya?.available) paymentMethods.push("Maya");
+          
           groups[item.stallId] = {
             stallId: item.stallId,
             stallName: item.stallName,
+            stallPicture: stall.stallPicture || null,
             items: [],
-            paymentMethods: stall?.paymentMethods || ["Cash"],
-            paymentDetails: stall?.paymentDetails || { gcashNumber: null, mayaNumber: null }
+            paymentMethods: paymentMethods.length > 0 ? paymentMethods : ["Cash"],
+            paymentDetails: {
+              gcashNumber: stall.paymentMethod?.gcash?.phoneNumber || null,
+              mayaNumber: stall.paymentMethod?.paymaya?.phoneNumber || null
+            }
           };
         } catch {
           groups[item.stallId] = {
             stallId: item.stallId,
             stallName: item.stallName,
+            stallPicture: null,
             items: [],
             paymentMethods: ["Cash"],
             paymentDetails: { gcashNumber: null, mayaNumber: null }
@@ -96,7 +105,6 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
     
     setStallGroups(groups);
     
-    // Set first stall as selected if only one stall has items
     const stallIds = Object.keys(groups);
     if (stallIds.length === 1) {
       setSelectedStallId(stallIds[0]);
@@ -139,7 +147,6 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
   }
 
   function toggleSelectStall(stallId: string) {
-    // Uncheck all items from other stalls
     const updated = cartItems.map(item => {
       if (item.stallId === stallId) {
         return { ...item, isChecked: true };
@@ -151,15 +158,12 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
     saveCart(updated);
   }
 
-  // Get checked items - only from selected stall
   const checkedItems = cartItems.filter(item => 
     item.isChecked && item.stallId === selectedStallId
   );
   
   const totalAmount = checkedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = checkedItems.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Get selected stall's payment methods
   const selectedStall = selectedStallId ? stallGroups[selectedStallId] : null;
 
   function handleProceedToCheckout() {
@@ -173,7 +177,6 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
       return;
     }
 
-    // Navigate to preorder with selected items
     onNavigate("preorder", {
       items: checkedItems,
       stallId: selectedStall.stallId,
@@ -266,59 +269,142 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
               )}
             </div>
 
-            {/* Cart Items */}
-            <div className="cart-items">
-              {selectedStallId && stallGroups[selectedStallId]?.items.map((item) => (
-                <div key={item.productId} className="cart-item">
-                  <div className="cart-item-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={item.isChecked}
-                      onChange={() => toggleCheck(item.productId)}
-                    />
-                  </div>
-                  <div className="cart-item-image">
-                    <img
-                      src={item.photos?.[0] || "https://via.placeholder.com/80x80?text=No+Image"}
-                      alt={item.productName}
-                    />
-                  </div>
-                  <div className="cart-item-info">
-                    <h4>{item.productName}</h4>
-                    <div className="cart-item-meta">
-                      <span className="item-price">₱{item.price.toFixed(2)}</span>
-                      {item.nutrition?.calories && (
-                        <span className="item-calories">🔥 {item.nutrition.calories} cal</span>
+            {/* Cart Items Table - One table per stall */}
+            {Object.entries(stallGroups).map(([stallId, group]) => {
+              const isSelected = selectedStallId === stallId;
+              const groupTotal = group.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+              
+              return (
+                <div key={stallId} className="stall-cart-table-wrapper">
+                  <div className="stall-cart-header">
+                    <div className="stall-cart-info">
+                      {group.stallPicture && (
+                        <img 
+                          src={group.stallPicture} 
+                          alt={group.stallName} 
+                          className="stall-cart-avatar"
+                        />
                       )}
+                      <div>
+                        <h3>{group.stallName}</h3>
+                        <span className="stall-cart-item-count">
+                          {group.items.reduce((sum, item) => sum + item.quantity, 0)} items
+                        </span>
+                      </div>
+                    </div>
+                    <div className="stall-cart-total">
+                      <span>Total: ₱{groupTotal.toFixed(2)}</span>
                     </div>
                   </div>
-                  <div className="cart-item-actions">
-                    <div className="quantity-control">
-                      <button
-                        className="qty-btn"
-                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      >
-                        -
-                      </button>
-                      <span className="qty-value">{item.quantity}</span>
-                      <button
-                        className="qty-btn"
-                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                    <button
-                      className="remove-btn"
-                      onClick={() => removeItem(item.productId)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
+                  
+                  <div className="table-wrapper">
+                    <table className="cart-table">
+                      <thead>
+                        <tr>
+                          <th className="checkbox-col">
+                            <input
+                              type="checkbox"
+                              checked={isSelected ? group.items.every(item => item.isChecked) : false}
+                              onChange={() => {
+                                if (isSelected) {
+                                  const allChecked = group.items.every(item => item.isChecked);
+                                  const updated = cartItems.map(item => {
+                                    if (item.stallId === stallId) {
+                                      return { ...item, isChecked: !allChecked };
+                                    }
+                                    return item;
+                                  });
+                                  saveCart(updated);
+                                } else {
+                                  toggleSelectStall(stallId);
+                                }
+                              }}
+                            />
+                          </th>
+                          <th>Stall</th>  {/* ← ADD THIS LINE */}
+                          <th>Product</th>
+                          <th>Price</th>
+                          <th>Quantity</th>
+                          <th>Subtotal</th>
+                          <th className="actions-col">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.items.map((item) => {
+                          const itemSubtotal = item.price * item.quantity;
+                          const imageUrl = item.productImages?.[0] || "https://via.placeholder.com/60x60?text=No+Image";
+                          
+                          return (
+                            <tr key={item.productId} className={item.isChecked ? "checked" : ""}>
+                              <td className="checkbox-col">
+                                <input
+                                  type="checkbox"
+                                  checked={item.isChecked}
+                                  onChange={() => toggleCheck(item.productId)}
+                                  disabled={!isSelected}
+                                />
+                              </td>
+                              <td className="stall-cell">{group.stallName}</td>  {/* ← ADD THIS LINE */}
+                              <td className="product-cell">
+                                <div className="product-cell-content">
+                                  <img 
+                                    src={imageUrl} 
+                                    alt={item.productName}
+                                    className="cart-product-image"
+                                  />
+                                  <div className="cart-product-info">
+                                    <span className="cart-product-name">{item.productName}</span>
+                                    {item.nutrition?.calories && (
+                                      <span className="cart-product-calories">🔥 {item.nutrition.calories} cal</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="price-cell">₱{item.price.toFixed(2)}</td>
+                              <td className="quantity-cell">
+                                <div className="quantity-control">
+                                  <button
+                                    className="qty-btn"
+                                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                  >
+                                    -
+                                  </button>
+                                  <span className="qty-value">{item.quantity}</span>
+                                  <button
+                                    className="qty-btn"
+                                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="subtotal-cell">₱{itemSubtotal.toFixed(2)}</td>
+                              <td className="actions-col">
+                                <button
+                                  className="remove-btn"
+                                  onClick={() => removeItem(item.productId)}
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={4} className="total-label">Total for {group.stallName}</td>
+                          <td className="total-amount">₱{groupTotal.toFixed(2)}</td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
 
+            {/* Cart Summary */}
             <div className="cart-summary">
               <div className="summary-row">
                 <span>Selected Stall:</span>

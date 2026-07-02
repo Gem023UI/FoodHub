@@ -1,0 +1,141 @@
+// ── API Base URL ────────────────────────────────────────────────────────
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
+// ── Order Types ────────────────────────────────────────────────────────
+export interface OrderLine {
+  productId: string;
+  productName: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface PaymentRecord {
+  orderId: string;
+  totalAmount: number;
+  paymentMethod: "cash" | "gcash" | "paymaya";
+  paymentReference: string;
+  paymongoPaymentId: string | null;
+  paymongoCheckoutId: string | null;
+  paymongoCheckoutUrl: string | null;
+  status: "pending" | "paid" | "refunded";
+  paidAt: string | null;
+}
+
+export interface Order {
+  _id: string;
+  studentId: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    tuptId: string;
+    course: string;
+    section: string;
+    profilePictureUrl: string | null;
+  } | string;
+  stallId: {
+    _id: string;
+    stallName: string;
+    stallPicture: string | null;
+    section: number;
+  } | string;
+  course: string;
+  orderLines: OrderLine[];
+  totalAmount: number;
+  orderStatus: "pending" | "preparing" | "ready" | "completed" | "cancelled";
+  paymentMethod: "cash" | "gcash" | "paymaya";
+  paymentRecord: PaymentRecord;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Order Functions ────────────────────────────────────────────────────
+export async function createOrder(
+  token: string,
+  orderData: {
+    stallId: string;
+    items: Array<{ productId: string; quantity: number }>;
+    paymentMethod: "cash" | "gcash" | "paymaya";
+    pickupTime: string;
+  }
+): Promise<{ order: Order }> {
+  const response = await fetch(`${apiBaseUrl}/orders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(orderData),
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Failed to create order");
+  }
+  return response.json();
+}
+
+export async function getStudentOrders(token: string): Promise<Order[]> {
+  const response = await fetch(`${apiBaseUrl}/orders/student`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch orders");
+  const data = await response.json() as { orders: Order[] };
+  return data.orders;
+}
+
+export async function getStallOrders(token: string, stallId: string, status?: string): Promise<Order[]> {
+  const params = status ? `?status=${status}` : '';
+  const response = await fetch(`${apiBaseUrl}/orders/stall/${stallId}${params}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch stall orders");
+  const data = await response.json() as { orders: Order[] };
+  return data.orders;
+}
+
+export async function getOrderById(token: string, orderId: string): Promise<Order> {
+  const response = await fetch(`${apiBaseUrl}/orders/${orderId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch order");
+  const data = await response.json() as { order: Order };
+  return data.order;
+}
+
+export async function updateOrderStatus(token: string, orderId: string, status: "pending" | "preparing" | "ready" | "completed" | "cancelled"): Promise<{ order: Order }> {
+  const response = await fetch(`${apiBaseUrl}/orders/${orderId}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Failed to update order status");
+  }
+  return response.json();
+}
+
+export async function updatePaymentStatus(
+  token: string,
+  orderId: string,
+  paymentStatus: "pending" | "paid" | "refunded",
+  paymentData?: any
+): Promise<{ order: Order }> {
+  const response = await fetch(`${apiBaseUrl}/orders/${orderId}/payment`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ paymentStatus, paymentData }),
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Failed to update payment status");
+  }
+  return response.json();
+}

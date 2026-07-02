@@ -5,7 +5,7 @@ exports.authRouter = void 0;
 
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const auth_service_1 = require("../services/auth.service");
+const auth_controller_1 = require("../controllers/auth.controller");
 
 const authRouter = (0, express_1.Router)();
 exports.authRouter = authRouter;
@@ -13,8 +13,8 @@ exports.authRouter = authRouter;
 // ─── STUDENT REGISTER ────────────────────────────────────────────────────
 authRouter.post("/register/student", async (request, response) => {
     const {
-        firstName, lastName, birthday, email,
-        tuptId, course, section, contactNumber, password
+        firstName, lastName, birthdate, email,
+        tuptId, course, section, contactNumber, password, profilePictureUrl
     } = request.body;
 
     if (!firstName || !lastName || !email || !password || !tuptId || !course || !section) {
@@ -33,9 +33,9 @@ authRouter.post("/register/student", async (request, response) => {
         return;
     }
 
-    const result = await (0, auth_service_1.registerStudent)({
-        firstName, lastName, birthday, email,
-        tuptId, course, section, contactNumber, password
+    const result = await (0, auth_controller_1.registerStudent)({
+        firstName, lastName, birthdate, email,
+        tuptId, course, section, contactNumber, password, profilePictureUrl
     });
 
     if (!result.success) {
@@ -54,44 +54,6 @@ authRouter.post("/register/student", async (request, response) => {
     });
 });
 
-// ─── VENDOR REGISTER ────────────────────────────────────────────────────
-authRouter.post("/register/vendor", async (request, response) => {
-    const {
-        firstName, lastName, email, password,
-        contactNumber, proofOfLegitimacyUrl, stallId
-    } = request.body;
-
-    // Validate required fields including stallId
-    if (!firstName || !lastName || !email || !password || !stallId) {
-        response.status(400).json({ 
-            message: "All required fields including stall selection must be provided." 
-        });
-        return;
-    }
-
-    const result = await (0, auth_service_1.registerVendor)({
-        firstName, lastName, email, password,
-        contactNumber, proofOfLegitimacyUrl, stallId
-    });
-
-    if (!result.success) {
-        const messages = {
-            email_exists: "An account with that email already exists.",
-            stall_not_found: "Selected stall not found.",
-            stall_taken: "This stall already has an assigned vendor."
-        };
-        response.status(400).json({ 
-            message: messages[result.reason] || "Registration failed." 
-        });
-        return;
-    }
-
-    response.status(201).json({ 
-        message: "Registration successful! Please check your email for the verification code.",
-        stallId: result.data.stallId
-    });
-});
-
 // ─── LOGIN ──────────────────────────────────────────────────────────────
 authRouter.post("/login", async (request, response) => {
     const { email, password } = request.body;
@@ -101,7 +63,7 @@ authRouter.post("/login", async (request, response) => {
         return;
     }
 
-    const result = await (0, auth_service_1.loginUser)(email, password);
+    const result = await (0, auth_controller_1.loginUser)(email, password);
 
     if (!result.success) {
         const messages = {
@@ -126,7 +88,7 @@ authRouter.post("/verify-email", async (request, response) => {
         return;
     }
 
-    const result = await (0, auth_service_1.verifyEmail)(email, code);
+    const result = await (0, auth_controller_1.verifyEmail)(email, code);
 
     if (!result.success) {
         const messages = {
@@ -151,7 +113,7 @@ authRouter.post("/resend-verification", async (request, response) => {
         return;
     }
 
-    const result = await (0, auth_service_1.resendVerification)(email);
+    const result = await (0, auth_controller_1.resendVerification)(email);
 
     if (!result.success) {
         const messages = {

@@ -2,51 +2,9 @@ import { useState, useEffect } from "react";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getProductById, getReviewsByProduct, toggleFavorite } from "../lib/api";
-import "../styles/Product.css";
-
-interface ProductData {
-  _id: string;
-  name: string;
-  description: string;
-  price: number;
-  photos: string[];
-  category: string;
-  isAvailable: boolean;
-  ingredients: string[];
-  allergens: string[];
-  nutrition: {
-    calories: number | null;
-    proteinGrams: number | null;
-    carbsGrams: number | null;
-    fatGrams: number | null;
-    sodiumMilligrams: number | null;
-  };
-  stallId: {
-    _id: string;
-    name: string;
-    location: string;
-    photos: string[];
-  } | string;
-  favoriteCount: number;
-  averageRating: number;
-  reviewCount: number;
-}
-
-interface ReviewData {
-  _id: string;
-  studentId: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    profilePictureUrl: string | null;
-    course: string;
-  };
-  rating: number;
-  comment: string;
-  photos: string[];
-  createdAt: string;
-}
+import { toggleFavorite, checkFavorite, getFavorites } from "../services/favorite.service";
+import { getProductDetails, type Product, type ProductReview } from "../services/product.service";
+import { getReviewsByProduct, createReview } from "../services/review.service";
 
 interface ProductProps {
   token?: string;
@@ -56,13 +14,18 @@ interface ProductProps {
 }
 
 export function Product({ token, productId, onNavigate, onLogout }: ProductProps) {
-  const [product, setProduct] = useState<ProductData | null>(null);
-  const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (productId) {
@@ -74,7 +37,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
     setIsLoading(true);
     setError(null);
     try {
-      const productData = await getProductById(productId);
+      const productData = await getProductDetails(productId);
       setProduct(productData);
 
       // Load reviews
@@ -84,13 +47,8 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
       // Check if favorited (only if logged in)
       if (token) {
         try {
-          const favResponse = await fetch(`/api/favorites/check/${productId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (favResponse.ok) {
-            const data = await favResponse.json();
-            setIsFavorited(data.isFavorited);
-          }
+          const favResult = await checkFavorite(token, productId);
+          setIsFavorited(favResult.isFavorited);
         } catch (err) {
           console.error("Error checking favorite:", err);
         }
@@ -111,13 +69,40 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
     try {
       const result = await toggleFavorite(token, productId);
       setIsFavorited(result.isFavorited);
-      // Update favorite count
       setProduct(prev => prev ? {
         ...prev,
-        favoriteCount: result.isFavorited ? prev.favoriteCount + 1 : prev.favoriteCount - 1
+        favorite: result.isFavorited ? (prev.favorite || 0) + 1 : (prev.favorite || 0) - 1
       } : null);
     } catch (err) {
       console.error("Error toggling favorite:", err);
+    }
+  }
+
+  async function handleSubmitReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token) {
+      onNavigate("login");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    setError(null);
+    try {
+      const result = await createReview(token, {
+        productId,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      setReviews(prev => [...prev, result.review]);
+      setShowReviewModal(false);
+      setReviewComment("");
+      setReviewRating(5);
+      setReviewSuccess("Review submitted successfully!");
+      setTimeout(() => setReviewSuccess(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit review");
+    } finally {
+      setIsSubmittingReview(false);
     }
   }
 
@@ -129,10 +114,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
 
     if (!product) return;
 
-    // Get existing cart
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]");
-    
-    // Check if item already exists
     const existingIndex = existingCart.findIndex(
       (item: any) => item.productId === product._id
     );
@@ -142,20 +124,19 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
     } else {
       existingCart.push({
         productId: product._id,
-        productName: product.name,
+        productName: product.productName,
         price: product.price,
         quantity: quantity,
-        photos: product.photos,
+        productImages: product.productImages,
         nutrition: product.nutrition,
         stallId: typeof product.stallId === "object" ? product.stallId._id : product.stallId,
-        stallName: typeof product.stallId === "object" ? product.stallId.name : "",
+        stallName: typeof product.stallId === "object" ? product.stallId.stallName : "",
         isChecked: true
       });
     }
 
     localStorage.setItem("cart", JSON.stringify(existingCart));
     
-    // Show success feedback
     const addBtn = document.querySelector('.add-to-cart-btn');
     if (addBtn) {
       addBtn.textContent = '✅ Added!';
@@ -173,7 +154,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
 
     if (!product) return;
 
-    // Add to cart first
     const existingCart = JSON.parse(localStorage.getItem("cart") || "[]");
     const existingIndex = existingCart.findIndex(
       (item: any) => item.productId === product._id
@@ -184,31 +164,30 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
     } else {
       existingCart.push({
         productId: product._id,
-        productName: product.name,
+        productName: product.productName,
         price: product.price,
         quantity: quantity,
-        photos: product.photos,
+        productImages: product.productImages,
         nutrition: product.nutrition,
         stallId: typeof product.stallId === "object" ? product.stallId._id : product.stallId,
-        stallName: typeof product.stallId === "object" ? product.stallId.name : "",
+        stallName: typeof product.stallId === "object" ? product.stallId.stallName : "",
         isChecked: true
       });
     }
 
     localStorage.setItem("cart", JSON.stringify(existingCart));
 
-    // Navigate to preorder with this item
     onNavigate("preorder", {
       items: [{
         productId: product._id,
-        productName: product.name,
+        productName: product.productName,
         price: product.price,
         quantity: quantity,
-        photos: product.photos,
+        productImages: product.productImages,
         nutrition: product.nutrition
       }],
       stallId: typeof product.stallId === "object" ? product.stallId._id : product.stallId,
-      stallName: typeof product.stallId === "object" ? product.stallId.name : "",
+      stallName: typeof product.stallId === "object" ? product.stallId.stallName : "",
       totalAmount: product.price * quantity
     });
   }
@@ -241,7 +220,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
     );
   }
 
-  const stallName = typeof product.stallId === "object" ? product.stallId.name : "";
+  const stallName = typeof product.stallId === "object" ? product.stallId.stallName : "";
   const stallId = typeof product.stallId === "object" ? product.stallId._id : product.stallId;
 
   return (
@@ -253,27 +232,30 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
           ← Back to Stalls
         </button>
 
+        {reviewSuccess && <div className="alert alert-success">{reviewSuccess}</div>}
+        {error && <div className="alert alert-error">{error}</div>}
+
         <div className="product-content">
           {/* Image Gallery */}
           <div className="product-gallery">
             <div className="main-image">
               <img
-                src={product.photos?.[activeImage] || "https://via.placeholder.com/400x400?text=No+Image"}
-                alt={product.name}
+                src={product.productImages?.[activeImage] || "https://via.placeholder.com/400x400?text=No+Image"}
+                alt={product.productName}
               />
-              {!product.isAvailable && (
+              {!product.available && (
                 <span className="unavailable-badge">Unavailable</span>
               )}
             </div>
-            {product.photos && product.photos.length > 1 && (
+            {product.productImages && product.productImages.length > 1 && (
               <div className="thumbnail-list">
-                {product.photos.map((photo, index) => (
+                {product.productImages.map((photo, index) => (
                   <button
                     key={index}
                     className={`thumbnail ${index === activeImage ? "active" : ""}`}
                     onClick={() => setActiveImage(index)}
                   >
-                    <img src={photo} alt={`${product.name} ${index + 1}`} />
+                    <img src={photo} alt={`${product.productName} ${index + 1}`} />
                   </button>
                 ))}
               </div>
@@ -283,7 +265,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
           {/* Product Info */}
           <div className="product-info">
             <div className="product-header">
-              <h1>{product.name}</h1>
+              <h1>{product.productName}</h1>
               <div className="product-actions-header">
                 <button
                   className={`favorite-btn ${isFavorited ? "favorited" : ""}`}
@@ -291,7 +273,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
                   title={token ? "Add to favorites" : "Login to favorite"}
                 >
                   <i className={`fas ${isFavorited ? "fa-heart" : "fa-heart"}`}></i>
-                  <span>{product.favoriteCount || 0}</span>
+                  <span>{product.favorite || 0}</span>
                 </button>
               </div>
             </div>
@@ -303,76 +285,48 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
               </span>
               {product.averageRating > 0 && (
                 <span className="product-rating">
-                  ⭐ {product.averageRating.toFixed(1)} ({product.reviewCount} reviews)
+                  ⭐ {product.averageRating.toFixed(1)} ({product.reviewCount || 0} reviews)
                 </span>
               )}
             </div>
 
             <div className="product-category">
               <span className="category-tag">{product.category || "General"}</span>
-              <span className={`availability ${product.isAvailable ? "available" : "unavailable"}`}>
-                {product.isAvailable ? "Available" : "Unavailable"}
+              <span className={`availability ${product.available ? "available" : "unavailable"}`}>
+                {product.available ? "Available" : "Unavailable"}
               </span>
             </div>
 
             <div className="product-description">
               <h3>Description</h3>
-              <p>{product.description || "No description available."}</p>
+              <p>{product.productDescription || "No description available."}</p>
             </div>
-
-            {product.ingredients && product.ingredients.length > 0 && (
-              <div className="product-ingredients">
-                <h3>Ingredients</h3>
-                <ul>
-                  {product.ingredients.map((ing, index) => (
-                    <li key={index}>{ing}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {product.allergens && product.allergens.length > 0 && (
-              <div className="product-allergens">
-                <h3>⚠️ Allergens</h3>
-                <ul>
-                  {product.allergens.map((allergen, index) => (
-                    <li key={index}>{allergen}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
             <div className="product-nutrition">
               <h3>Nutrition Facts</h3>
               <div className="nutrition-grid">
-                {product.nutrition.calories && (
+                {product.nutrition?.calories && (
                   <div className="nutrition-item">
                     <span className="nutrition-label">Calories</span>
                     <span className="nutrition-value">{product.nutrition.calories}</span>
                   </div>
                 )}
-                {product.nutrition.proteinGrams && (
+                {product.nutrition?.protein && (
                   <div className="nutrition-item">
                     <span className="nutrition-label">Protein</span>
-                    <span className="nutrition-value">{product.nutrition.proteinGrams}g</span>
+                    <span className="nutrition-value">{product.nutrition.protein}g</span>
                   </div>
                 )}
-                {product.nutrition.carbsGrams && (
+                {product.nutrition?.carbs && (
                   <div className="nutrition-item">
                     <span className="nutrition-label">Carbs</span>
-                    <span className="nutrition-value">{product.nutrition.carbsGrams}g</span>
+                    <span className="nutrition-value">{product.nutrition.carbs}g</span>
                   </div>
                 )}
-                {product.nutrition.fatGrams && (
+                {product.nutrition?.allergen && (
                   <div className="nutrition-item">
-                    <span className="nutrition-label">Fat</span>
-                    <span className="nutrition-value">{product.nutrition.fatGrams}g</span>
-                  </div>
-                )}
-                {product.nutrition.sodiumMilligrams && (
-                  <div className="nutrition-item">
-                    <span className="nutrition-label">Sodium</span>
-                    <span className="nutrition-value">{product.nutrition.sodiumMilligrams}mg</span>
+                    <span className="nutrition-label">Allergen</span>
+                    <span className="nutrition-value">{product.nutrition.allergen}</span>
                   </div>
                 )}
               </div>
@@ -385,7 +339,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
                   <button
                     className="qty-btn"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={!product.isAvailable}
+                    disabled={!product.available}
                   >
                     -
                   </button>
@@ -393,7 +347,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
                   <button
                     className="qty-btn"
                     onClick={() => setQuantity(quantity + 1)}
-                    disabled={!product.isAvailable}
+                    disabled={!product.available}
                   >
                     +
                   </button>
@@ -404,14 +358,14 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
                 <button
                   className="add-to-cart-btn"
                   onClick={handleAddToCart}
-                  disabled={!product.isAvailable}
+                  disabled={!product.available}
                 >
                   <i className="fas fa-cart-plus"></i> Add to Cart
                 </button>
                 <button
                   className="order-now-btn"
                   onClick={handleOrderNow}
-                  disabled={!product.isAvailable}
+                  disabled={!product.available}
                 >
                   <i className="fas fa-bolt"></i> Order Now
                 </button>
@@ -422,7 +376,18 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
 
         {/* Reviews Section */}
         <div className="reviews-section">
-          <h2>Reviews ({reviews.length})</h2>
+          <div className="reviews-header">
+            <h2>Reviews ({reviews.length})</h2>
+            {token && (
+              <button 
+                className="btn-primary"
+                onClick={() => setShowReviewModal(true)}
+                disabled={!product.available}
+              >
+                Write a Review
+              </button>
+            )}
+          </div>
           {reviews.length === 0 ? (
             <p className="no-reviews">No reviews yet. Be the first to review!</p>
           ) : (
@@ -432,31 +397,30 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
                   <div className="review-header">
                     <div className="reviewer-info">
                       <div className="reviewer-avatar">
-                        {review.studentId.profilePictureUrl ? (
-                          <img src={review.studentId.profilePictureUrl} alt="" />
+                        {review.reviewProfileUrl ? (
+                          <img src={review.reviewProfileUrl} alt="" />
                         ) : (
-                          <span>{review.studentId.firstName[0]}{review.studentId.lastName[0]}</span>
+                          <span>{review.reviewEmail?.[0]?.toUpperCase() || "U"}</span>
                         )}
                       </div>
                       <div className="reviewer-name">
-                        <span>{review.studentId.firstName} {review.studentId.lastName}</span>
-                        <span className="reviewer-course">{review.studentId.course}</span>
+                        <span>{review.reviewEmail}</span>
                       </div>
                     </div>
                     <div className="review-rating">
                       {'⭐'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                     </div>
                   </div>
-                  <div className="review-comment">{review.comment}</div>
-                  {review.photos && review.photos.length > 0 && (
+                  {review.comment && <div className="review-comment">{review.comment}</div>}
+                  {review.reviewImages && review.reviewImages.length > 0 && (
                     <div className="review-photos">
-                      {review.photos.map((photo, index) => (
+                      {review.reviewImages.map((photo, index) => (
                         <img key={index} src={photo} alt={`Review ${index + 1}`} />
                       ))}
                     </div>
                   )}
                   <div className="review-date">
-                    {new Date(review.createdAt).toLocaleDateString('en-US', {
+                    {new Date(review.reviewDate).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric'
@@ -468,6 +432,52 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
           )}
         </div>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Write a Review</h2>
+              <button className="modal-close" onClick={() => setShowReviewModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSubmitReview} className="review-form">
+              <div className="form-group">
+                <label>Rating</label>
+                <div className="rating-selector">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      className={`rating-star ${num <= reviewRating ? "active" : ""}`}
+                      onClick={() => setReviewRating(num)}
+                    >
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Comment</label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Share your experience with this product..."
+                  rows={4}
+                />
+              </div>
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowReviewModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={isSubmittingReview}>
+                  {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <Footer onNavigate={onNavigate} />
     </div>

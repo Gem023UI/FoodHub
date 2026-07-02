@@ -39,4 +39,32 @@ function createProductUpload() {
   return multer({ storage });
 }
 
-module.exports = { initCloudinary, createVendorUpload, createProductUpload };
+function createStudentProfileUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/profiles/students",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 500, height: 500, crop: "fill", gravity: "face" }],
+    },
+  });
+  return multer({ storage });
+}
+
+function createVendorProfileUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/profiles/vendors",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 500, height: 500, crop: "fill", gravity: "face" }],
+    },
+  });
+  return multer({ storage });
+}
+
+module.exports.createStudentProfileUpload = createStudentProfileUpload;
+module.exports.createVendorProfileUpload = createVendorProfileUpload;
+module.exports = { initCloudinary, createVendorUpload, createProductUpload, createStudentProfileUpload, createVendorProfileUpload };

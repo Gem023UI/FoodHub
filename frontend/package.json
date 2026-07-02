@@ -9,16 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@react-three/rapier": "^2.2.0",
     "chart.js": "^4.5.1",
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
+    "meshline": "^3.3.1",
     "react": "^19.2.7",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.80.0",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.18.0",
-    "styled-components": "^6.4.2"
+    "styled-components": "^6.4.2",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
