@@ -5,6 +5,7 @@ import Loader from "../components/Loader";
 import { toggleFavorite, checkFavorite, getFavorites } from "../services/favorite.service";
 import { getProductDetails, type Product, type ProductReview } from "../services/product.service";
 import { getReviewsByProduct, createReview } from "../services/review.service";
+import "../styles/Product.css";
 
 interface ProductProps {
   token?: string;

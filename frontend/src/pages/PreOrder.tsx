@@ -46,7 +46,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
   }>({ gcashNumber: null, mayaNumber: null });
   
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "paymaya">("cash");
-  const [pickupTime, setPickupTime] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -72,11 +71,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
         setPaymentMethod(methodMap[preorderData.paymentMethods[0]] || "cash");
       }
     }
-
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + 30);
-    const timeString = now.toTimeString().slice(0, 5);
-    setPickupTime(timeString);
   }, [preorderData]);
 
   useEffect(() => {
@@ -97,21 +91,32 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     setIsLoading(true);
     setError(null);
 
-    if (!pickupTime) {
-      setError("Please select a pickup time.");
+    if (!stallId) {
+      setError("No stall selected. Please go back and try again.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (items.length === 0) {
+      setError("No items in your order.");
       setIsLoading(false);
       return;
     }
 
     try {
+      console.log("📦 Order payload:", { 
+        stallId, 
+        itemsCount: items.length, 
+        paymentMethod
+      });
+
       const orderInput = {
         stallId,
         items: items.map(item => ({
           productId: item.productId,
           quantity: item.quantity
         })),
-        paymentMethod: paymentMethod,
-        pickupTime
+        paymentMethod: paymentMethod
       };
 
       const result = await createOrder(token, orderInput);
@@ -127,6 +132,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
         setPaymentUrl("https://checkout.paymongo.com/checkout/session");
       }
     } catch (err) {
+      console.error("❌ Order error:", err);
       setError(err instanceof Error ? err.message : "Failed to place order");
     } finally {
       setIsLoading(false);
@@ -175,10 +181,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             <div className="order-detail-row">
               <span>Payment:</span>
               <span>{methodToDisplay[paymentMethod]}</span>
-            </div>
-            <div className="order-detail-row">
-              <span>Pickup:</span>
-              <span>{pickupTime}</span>
             </div>
           </div>
 
@@ -314,20 +316,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
                   </label>
                 )}
               </div>
-            </div>
-
-            <div className="form-group">
-              <label>Pickup Time</label>
-              <input
-                type="time"
-                value={pickupTime}
-                onChange={(e) => setPickupTime(e.target.value)}
-                required
-                min={new Date().toTimeString().slice(0, 5)}
-              />
-              <p className="field-help">
-                Orders are typically ready in 20-30 minutes.
-              </p>
             </div>
 
             <button

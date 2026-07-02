@@ -11,10 +11,16 @@ exports.calculateOrderTotal = calculateOrderTotal;
 
 const models_1 = require("../models");
 const mailer_1 = require("../utils/mailer");
+const mongoose_1 = require("mongoose");
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 async function createOrder(data) {
-    const { studentId, stallId, items, paymentMethod, pickupTime } = data;
+    const { studentId, stallId, items, paymentMethod } = data;
+
+    // Validate required fields
+    if (!stallId || !items || !items.length || !paymentMethod) {
+        return { success: false, reason: "missing_required_fields" };
+    }
 
     const stall = await models_1.StallModel.findById(stallId);
     if (!stall) return { success: false, reason: "stall_not_found" };
@@ -26,7 +32,8 @@ async function createOrder(data) {
     const orderLines = [];
 
     for (const item of items) {
-        const product = stall.products.id(item.productId);
+        // Find product in stall's products array
+        const product = stall.products.find(p => p._id.toString() === item.productId);
         if (!product) return { success: false, reason: "product_not_found", productId: item.productId };
         if (!product.available) return { success: false, reason: "product_unavailable", productName: product.productName };
         if (product.stocks < item.quantity) return { success: false, reason: "insufficient_stock", productName: product.productName };
@@ -47,7 +54,12 @@ async function createOrder(data) {
 
     await stall.save();
 
+    // Generate a new ObjectId for the order
+    const orderId = new mongoose_1.Types.ObjectId();
+
+    // Create the order with a proper ObjectId for paymentRecord
     const order = await models_1.OrderModel.create({
+        _id: orderId,
         studentId,
         stallId,
         course: student.course,
@@ -56,22 +68,23 @@ async function createOrder(data) {
         orderStatus: "pending",
         paymentMethod,
         paymentRecord: {
-            orderId: null, // Will be updated after order creation
+            orderId: orderId, // Use the same ObjectId
             totalAmount,
             paymentMethod,
-            paymentReference: `ORD-${Date.now()}`,
+            paymentReference: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
             status: "pending"
         }
     });
 
-    // Update payment record with orderId
-    order.paymentRecord.orderId = order._id;
-    await order.save();
+    // Populate the order before returning
+    const populatedOrder = await models_1.OrderModel.findById(order._id)
+        .populate("studentId", "firstName lastName email tuptId course section profilePictureUrl")
+        .populate("stallId", "stallName stallPicture section");
 
     // Budget cap check
     await checkBudgetCapAndNotify(studentId, totalAmount);
 
-    return { success: true, data: { order: order.toObject() } };
+    return { success: true, data: { order: populatedOrder.toObject() } };
 }
 
 // ── BUDGET CAP CHECK ─────────────────────────────────────────────────────

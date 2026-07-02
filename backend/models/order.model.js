@@ -21,8 +21,8 @@ const paymentRecordSchema = new mongoose_1.Schema({
   orderId: {
     type: mongoose_1.Schema.Types.ObjectId,
     ref: "Order",
-    required: true,
-    unique: true
+    required: false, // Changed from true to false to allow null initially
+    default: null
   },
   totalAmount: { type: Number, required: true, min: 0 },
   paymentMethod: {

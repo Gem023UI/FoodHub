@@ -57,7 +57,6 @@ export async function createOrder(
     stallId: string;
     items: Array<{ productId: string; quantity: number }>;
     paymentMethod: "cash" | "gcash" | "paymaya";
-    pickupTime: string;
   }
 ): Promise<{ order: Order }> {
   const response = await fetch(`${apiBaseUrl}/orders`, {
@@ -68,6 +67,7 @@ export async function createOrder(
     },
     body: JSON.stringify(orderData),
   });
+  
   if (!response.ok) {
     const data = await response.json() as { message?: string };
     throw new Error(data.message ?? "Failed to create order");

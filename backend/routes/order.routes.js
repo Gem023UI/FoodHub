@@ -17,12 +17,26 @@ function firstParam(value) {
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
-    const { stallId, items, paymentMethod, pickupTime } = request.body;
+    const { stallId, items, paymentMethod } = request.body;
     const studentId = request.userId;
 
-    if (!stallId || !items || !items.length || !paymentMethod || !pickupTime) {
+    console.log("📦 Order request:", { 
+        stallId, 
+        itemsCount: items?.length, 
+        paymentMethod,
+        studentId 
+    });
+
+    // Remove pickupTime from validation
+    if (!stallId || !items || !items.length || !paymentMethod) {
+        console.log("❌ Missing fields:", { 
+            hasStallId: !!stallId, 
+            hasItems: !!items, 
+            itemsLength: items?.length, 
+            hasPaymentMethod: !!paymentMethod
+        });
         response.status(400).json({ 
-            message: "stallId, items, paymentMethod, and pickupTime are required." 
+            message: "stallId, items, and paymentMethod are required." 
         });
         return;
     }
@@ -31,9 +45,10 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
         studentId,
         stallId,
         items,
-        paymentMethod,
-        pickupTime
+        paymentMethod
     });
+
+    console.log("📦 Order result success:", result.success);
 
     if (!result.success) {
         const messages = {
@@ -41,7 +56,8 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
             student_not_found: "Student not found.",
             product_not_found: "Product not found.",
             product_unavailable: "Product is unavailable.",
-            insufficient_stock: "Insufficient stock for product."
+            insufficient_stock: "Insufficient stock for product.",
+            missing_required_fields: "Missing required fields."
         };
         response.status(400).json({ 
             message: messages[result.reason] || "Failed to create order." 
@@ -213,7 +229,7 @@ orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (reques
         
         if (!result.success) {
             response.status(400).json({ 
-                message: messages[result.reason] || "Failed to update payment status." 
+                message: "Failed to update payment status." 
             });
             return;
         }
