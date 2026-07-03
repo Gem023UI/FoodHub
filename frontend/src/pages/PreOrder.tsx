@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { createOrder } from "../services/order.service";
@@ -128,7 +127,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       localStorage.removeItem("cart");
 
       if (paymentMethod === "gcash" || paymentMethod === "paymaya") {
-        // In production, this would come from the backend
         setPaymentUrl("https://checkout.paymongo.com/checkout/session");
       }
     } catch (err) {
@@ -142,7 +140,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
   if (!preorderData) {
     return (
       <div className="preorder-page">
-        <Header onNavigate={onNavigate} token={token} />
         <div className="preorder-error">
           <h2>No items to checkout</h2>
           <p>Please add items to your cart first.</p>
@@ -157,9 +154,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
 
   if (orderPlaced) {
     return (
-      <div className="preorder-page">
-        <Header onNavigate={onNavigate} token={token} />
-        
+      <div className="preorder-page">        
         <div className="preorder-success">
           <div className="success-icon">✅</div>
           <h2>Order Placed Successfully!</h2>
@@ -228,8 +223,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
 
   return (
     <div className="preorder-page">
-      <Header onNavigate={onNavigate} token={token} />
-
       <div className="preorder-container">
         <div className="preorder-header">
           <button className="btn-back" onClick={() => onNavigate("cart")}>
@@ -333,3 +326,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     </div>
   );
 }
+
+// Add default export at the bottom
+export default Preorder;

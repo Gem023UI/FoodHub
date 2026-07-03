@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AdminHeader } from "../components/AdminHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getStudentInsights } from "../services/report.service";
@@ -51,7 +50,6 @@ export function AdminStudents({ token, onNavigate, onLogout }: AdminStudentsProp
   if (isLoading) {
     return (
       <div className="admin-students-page">
-        <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="admin-students" />
         <div className="admin-loading">
           <Loader />
         </div>
@@ -62,8 +60,6 @@ export function AdminStudents({ token, onNavigate, onLogout }: AdminStudentsProp
 
   return (
     <div className="admin-students-page">
-      <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="admin-students" />
-
       <div className="admin-students-container">
         <div className="admin-students-header">
           <div className="header-left">

@@ -24,6 +24,7 @@ const adminSchema = new mongoose_1.Schema(
       default: "admin",
       immutable: true,
     },
+    profilePictureUrl: { type: String, trim: true, default: null },
     status: {
       type: String,
       enum: ["unverified", "verified", "deactivated"],

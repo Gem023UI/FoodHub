@@ -197,23 +197,86 @@ usersRouter.patch("/vendors/:email", auth_1.authenticateRequest, (0, auth_1.auth
     }
 });
 
-// ─── PROFILE UPLOAD ROUTES ──────────────────────────────────────────────
-const { createStudentProfileUpload, createVendorProfileUpload } = require("../utils/cloudinary");
-const studentProfileUpload = createStudentProfileUpload();
-const vendorProfileUpload = createVendorProfileUpload();
-
-usersRouter.post("/profile/student", auth_1.authenticateRequest, studentProfileUpload.single("profile"), (request, response) => {
-    if (!request.file) {
-        response.status(400).json({ message: "No file uploaded." });
-        return;
+// ─── ADMIN ROUTES ──────────────────────────────────────────────────────
+usersRouter.get("/admins", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+    try {
+        const admins = await (0, user_controller_1.listAdmins)();
+        response.json({ admins });
+    } catch (error) {
+        console.error("Error fetching admins:", error);
+        response.status(500).json({ message: "Failed to fetch admins." });
     }
-    response.json({ url: request.file.path });
 });
 
-usersRouter.post("/profile/vendor", auth_1.authenticateRequest, vendorProfileUpload.single("profile"), (request, response) => {
-    if (!request.file) {
-        response.status(400).json({ message: "No file uploaded." });
-        return;
+usersRouter.patch("/admins/:id", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+    const id = firstParam(request.params.id);
+    try {
+        const admin = await (0, user_controller_1.updateAdmin)(id, request.body);
+        if (!admin) {
+            response.status(404).json({ message: "Admin not found." });
+            return;
+        }
+        response.json(admin);
+    } catch (error) {
+        console.error("Error updating admin:", error);
+        response.status(500).json({ message: "Failed to update admin." });
     }
-    response.json({ url: request.file.path });
+});
+
+// ─── PROFILE UPLOAD ROUTES ──────────────────────────────────────────────
+// Import the upload functions
+const { 
+    createStudentProfileUpload, 
+    createVendorProfileUpload,
+    createAdminProfileUpload 
+} = require("../utils/cloudinary");
+
+// Initialize the upload middleware
+const studentProfileUpload = createStudentProfileUpload();
+const vendorProfileUpload = createVendorProfileUpload();
+const adminProfileUpload = createAdminProfileUpload();
+
+// Student profile upload
+usersRouter.post("/profile/student", auth_1.authenticateRequest, studentProfileUpload.single("profile"), (request, response) => {
+    try {
+        if (!request.file) {
+            response.status(400).json({ message: "No file uploaded." });
+            return;
+        }
+        console.log("✅ Student profile picture uploaded:", request.file.path);
+        response.json({ url: request.file.path });
+    } catch (error) {
+        console.error("❌ Error uploading student profile picture:", error);
+        response.status(500).json({ message: "Failed to upload picture." });
+    }
+});
+
+// Vendor profile upload
+usersRouter.post("/profile/vendor", auth_1.authenticateRequest, vendorProfileUpload.single("profile"), (request, response) => {
+    try {
+        if (!request.file) {
+            response.status(400).json({ message: "No file uploaded." });
+            return;
+        }
+        console.log("✅ Vendor profile picture uploaded:", request.file.path);
+        response.json({ url: request.file.path });
+    } catch (error) {
+        console.error("❌ Error uploading vendor profile picture:", error);
+        response.status(500).json({ message: "Failed to upload picture." });
+    }
+});
+
+// Admin profile upload - FIXED
+usersRouter.post("/profile/admin", auth_1.authenticateRequest, adminProfileUpload.single("profile"), (request, response) => {
+    try {
+        if (!request.file) {
+            response.status(400).json({ message: "No file uploaded." });
+            return;
+        }
+        console.log("✅ Admin profile picture uploaded:", request.file.path);
+        response.json({ url: request.file.path });
+    } catch (error) {
+        console.error("❌ Error uploading admin profile picture:", error);
+        response.status(500).json({ message: "Failed to upload picture." });
+    }
 });

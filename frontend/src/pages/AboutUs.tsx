@@ -1,4 +1,3 @@
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import "../styles/AboutUs.css";
 
@@ -11,13 +10,6 @@ interface AboutUsProps {
 export function AboutUs({ onNavigate, token, onLogout }: AboutUsProps) {
   return (
     <div className="about-us-page">
-      <Header 
-        onNavigate={onNavigate} 
-        token={token} 
-        onLogout={onLogout}
-        currentPage="about"
-      />
-      
       <div className="about-us-container">
         <div className="about-header">
           <h1>About FoodHub</h1>

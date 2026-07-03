@@ -17,11 +17,27 @@ export interface Budget {
 }
 
 export interface StudentBudgetCap {
+  _id?: string;
   amount: number;
   period: "daily" | "weekly" | "monthly" | "custom";
   startDate: string;
   endDate: string;
   status: "active" | "accomplished" | "failed";
+  spent?: number;
+  remaining?: number;
+  percentageUsed?: number;
+}
+
+export interface SpendingAnalytics {
+  daily: number;
+  weekly: number;
+  monthly: number;
+  remaining: number;
+  totalSpent: number;
+  periodData: Array<{
+    label: string;
+    value: number;
+  }>;
 }
 
 // ── Budget Functions ──────────────────────────────────────────────────
@@ -57,6 +73,57 @@ export async function getStudentBudget(token: string): Promise<any> {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!response.ok) throw new Error("Failed to fetch student budget");
+  return response.json();
+}
+
+export async function getStudentBudgetCaps(token: string): Promise<StudentBudgetCap[]> {
+  const response = await fetch(`${apiBaseUrl}/budgets/student/caps`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    if (response.status === 404) return [];
+    throw new Error("Failed to fetch budget caps");
+  }
+  const data = await response.json() as { budgets: StudentBudgetCap[] };
+  return data.budgets || [];
+}
+
+export async function createBudgetCap(token: string, data: {
+  amount: number;
+  period: "daily" | "weekly" | "monthly" | "custom";
+  startDate: string;
+  endDate: string;
+}): Promise<{ budgetCap: StudentBudgetCap }> {
+  const response = await fetch(`${apiBaseUrl}/budgets/student/cap`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json() as { message?: string };
+    throw new Error(error.message ?? "Failed to create budget cap");
+  }
+  return response.json();
+}
+
+export async function getSpendingAnalytics(
+  token: string, 
+  period: "daily" | "weekly" | "monthly" | "custom",
+  startDate?: string, 
+  endDate?: string
+): Promise<SpendingAnalytics> {
+  const params = new URLSearchParams();
+  params.append("period", period);
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  
+  const response = await fetch(`${apiBaseUrl}/reports/spending?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to fetch spending analytics");
   return response.json();
 }
 

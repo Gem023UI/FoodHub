@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { AdminHeader } from "../components/AdminHeader";
 import { Footer } from "../components/Footer";
+import Lanyard from "../components/Lanyard";
 import Loader from "../components/Loader";
 import "../styles/AdminProfile.css";
 
@@ -10,6 +10,7 @@ interface AdminProfileData {
   lastName: string;
   email: string;
   role: string;
+  profilePictureUrl?: string | null;
   contactNumber?: string | null;
   status: string;
   createdAt: string;
@@ -22,6 +23,9 @@ interface AdminProfileProps {
   onLogout?: () => void;
 }
 
+// ── API Base URL ────────────────────────────────────────────────────────
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
 export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfileProps) {
   const [profile, setProfile] = useState<AdminProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +35,11 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
   // ── Section 1: edit / deactivate modals ──
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
   const [editContact, setEditContact] = useState("");
+  const [editPictureFile, setEditPictureFile] = useState<File | null>(null);
+  const [editPicturePreview, setEditPicturePreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
 
@@ -42,12 +50,15 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
   async function loadProfile() {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/users/me`, {
+      const response = await fetch(`${apiBaseUrl}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to load profile");
       const data = await response.json();
+      console.log("📋 Loaded profile data:", data);
       setProfile(data);
+      setEditFirstName(data.firstName || "");
+      setEditLastName(data.lastName || "");
       setEditContact(data.contactNumber || "");
       setError(null);
     } catch (err) {
@@ -57,26 +68,81 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
     }
   }
 
+  function handlePictureSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image size should be less than 2MB.");
+      return;
+    }
+    setEditPictureFile(file);
+    setEditPicturePreview(URL.createObjectURL(file));
+  }
+
   async function handleSaveEdit() {
     if (!profile) return;
     setIsSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admins/${userId}`, {
+      let profilePictureUrl = profile.profilePictureUrl || null;
+      
+      // Upload picture if a new one is selected
+      if (editPictureFile) {
+        const formData = new FormData();
+        formData.append("profile", editPictureFile);
+        
+        console.log("📤 Uploading admin profile picture to:", `${apiBaseUrl}/users/profile/admin`);
+        
+        const uploadRes = await fetch(`${apiBaseUrl}/users/profile/admin`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        
+        console.log("📤 Upload response status:", uploadRes.status);
+        
+        if (uploadRes.ok) {
+          const uploaded = await uploadRes.json();
+          profilePictureUrl = uploaded.url;
+          console.log("📸 Uploaded new profile picture:", profilePictureUrl);
+        } else {
+          const errorData = await uploadRes.json();
+          console.error("❌ Upload failed:", errorData);
+          throw new Error(errorData.message || "Failed to upload picture");
+        }
+      }
+
+      const response = await fetch(`${apiBaseUrl}/users/${userId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ contactNumber: editContact }),
+        headers: { 
+          "Content-Type": "application/json", 
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          firstName: editFirstName,
+          lastName: editLastName,
+          contactNumber: editContact,
+          profilePictureUrl: profilePictureUrl 
+        }),
       });
+      
       if (!response.ok) {
         const data = await response.json() as { message?: string };
         throw new Error(data.message || "Failed to save profile");
       }
+      
       const updated = await response.json();
+      console.log("✅ Profile updated:", updated);
+      
       setProfile(updated);
       setShowEditModal(false);
-      setSuccessMsg("Profile updated!");
+      setEditPictureFile(null);
+      setEditPicturePreview(null);
+      setSuccessMsg("Profile updated successfully!");
       setTimeout(() => setSuccessMsg(null), 3000);
+      
     } catch (err) {
+      console.error("❌ Error saving profile:", err);
       setError(err instanceof Error ? err.message : "Failed to save profile");
     } finally {
       setIsSaving(false);
@@ -87,8 +153,7 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
     setIsDeactivating(true);
     setError(null);
     try {
-      // TODO: wire to real deactivate endpoint, e.g. PATCH /api/admins/:id/deactivate
-      await fetch(`/api/admins/${userId}/deactivate`, {
+      await fetch(`${apiBaseUrl}/admins/${userId}/deactivate`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -104,7 +169,6 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
   if (isLoading) {
     return (
       <div className="admin-profile-page">
-        <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="admin-profile-loading">
           <Loader />
         </div>
@@ -116,7 +180,6 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
   if (!profile) {
     return (
       <div className="admin-profile-page">
-        <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="admin-profile-error">
           <p>Profile not found.</p>
         </div>
@@ -129,19 +192,18 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
 
   return (
     <div className="admin-profile-page">
-      <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
-
       {error && <div className="alert alert-error ap-alert">{error}</div>}
       {successMsg && <div className="alert alert-success ap-alert">{successMsg}</div>}
 
-      {/* ══════════════════════════ SECTION 1 — Admin Info (only section shown) ══════════════════════════ */}
       <section className="ap-hero">
         <div className="ap-hero-overlay" />
         <div className="ap-hero-content">
           <div className="ap-hero-text">
             <p className="ap-hero-welcome">Welcome,</p>
             <h1 className="ap-hero-name">{displayName}</h1>
-            <p className="ap-hero-meta">Administrator &nbsp; {profile.contactNumber || "No contact number set"}</p>
+            <p className="ap-hero-meta">
+              Administrator &nbsp; {profile.contactNumber || "No contact number set"}
+            </p>
             <p className="ap-hero-email">{profile.email}</p>
             <div className="ap-hero-actions">
               <button className="ap-btn ap-btn-yellow" onClick={() => setShowEditModal(true)}>EDIT PROFILE</button>
@@ -149,40 +211,64 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
             </div>
           </div>
 
-          {/* Stylized 3D lanyard placeholder — swap for a real 3D model later */}
           <div className="ap-lanyard-wrap">
-            <svg className="ap-lanyard-straps" viewBox="0 0 200 120" preserveAspectRatio="none">
-              <path d="M60 0 L100 90 L140 0" fill="none" stroke="#f5c518" strokeWidth="14" strokeLinecap="round" />
-            </svg>
-            <div className="ap-lanyard-card">
-              <div className="ap-lanyard-card-notch" />
-              <div className="ap-lanyard-photo">
-                <span>{displayName.charAt(0).toUpperCase()}</span>
-              </div>
-              <div className="ap-lanyard-line ap-lanyard-line-name" />
-              <div className="ap-lanyard-line" />
-              <div className="ap-lanyard-line short" />
-              {profile.status && (
-                <div className={`ap-status-badge ${profile.status === "verified" ? "active" : "inactive"}`}>
-                  {profile.status}
-                </div>
-              )}
-            </div>
+            <Lanyard
+              key={profile.profilePictureUrl || "default"}
+              frontImage={profile.profilePictureUrl || null}
+              imageFit="cover"
+            />
           </div>
         </div>
       </section>
 
       <Footer onNavigate={onNavigate} />
 
-      {/* ══════════════════════════ MODALS ══════════════════════════ */}
-
       {showEditModal && (
         <div className="ap-modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="ap-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Edit Profile</h3>
+            <div className="ap-modal-avatar-row">
+              <div 
+                className="ap-modal-avatar" 
+                style={(editPicturePreview || profile.profilePictureUrl) ? {
+                  backgroundImage: `url(${editPicturePreview || profile.profilePictureUrl})`, 
+                  backgroundSize: "cover", 
+                  backgroundPosition: "center"
+                } : {}}
+              >
+                {!(editPicturePreview || profile.profilePictureUrl) && <i className="fas fa-user" />}
+              </div>
+              <label className="ap-btn ap-btn-yellow-outline" style={{ cursor: "pointer" }}>
+                Upload Photo
+                <input type="file" accept="image/*" hidden onChange={handlePictureSelect} />
+              </label>
+            </div>
+            <div className="form-group">
+              <label>First Name</label>
+              <input 
+                type="text" 
+                value={editFirstName} 
+                onChange={(e) => setEditFirstName(e.target.value)} 
+                placeholder="Enter first name"
+              />
+            </div>
+            <div className="form-group">
+              <label>Last Name</label>
+              <input 
+                type="text" 
+                value={editLastName} 
+                onChange={(e) => setEditLastName(e.target.value)} 
+                placeholder="Enter last name"
+              />
+            </div>
             <div className="form-group">
               <label>Contact Number</label>
-              <input type="text" value={editContact} onChange={(e) => setEditContact(e.target.value)} placeholder="09XXXXXXXXX" />
+              <input 
+                type="text" 
+                value={editContact} 
+                onChange={(e) => setEditContact(e.target.value)} 
+                placeholder="09XXXXXXXXX"
+              />
             </div>
             <div className="ap-modal-actions">
               <button className="ap-btn ap-btn-white-outline" onClick={() => setShowEditModal(false)} disabled={isSaving}>Cancel</button>

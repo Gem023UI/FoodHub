@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { ProductCard } from "../components/ProductCard";
 import { getStalls } from "../services/stall.service";
@@ -155,13 +154,6 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
 
     return (
         <div className="landing-page">
-            <Header 
-                onNavigate={onNavigate} 
-                token={token} 
-                onLogout={onLogout}
-                currentPage="home"
-            />
-
             {/* ─── HERO ─── */}
             <section className="lp-hero">
                 <div className="lp-hero-image">

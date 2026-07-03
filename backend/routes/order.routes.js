@@ -7,6 +7,7 @@ const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const order_controller_1 = require("../controllers/order.controller");
 const stall_controller_1 = require("../controllers/stall.controller");
+const models_1 = require("../models"); // ADD THIS IMPORT
 
 const orderRouter = (0, express_1.Router)();
 exports.orderRouter = orderRouter;
@@ -27,7 +28,6 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
         studentId 
     });
 
-    // Remove pickupTime from validation
     if (!stallId || !items || !items.length || !paymentMethod) {
         console.log("❌ Missing fields:", { 
             hasStallId: !!stallId, 
@@ -81,12 +81,53 @@ orderRouter.get("/student", auth_1.authenticateRequest, async (request, response
     }
 });
 
+// ── GET STUDENT ORDERS WITH DATE RANGE ──────────────────────────────────
+orderRouter.get("/student/range", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+    const { startDate, endDate } = request.query;
+    
+    try {
+        console.log("📅 Order range request:", { studentId, startDate, endDate });
+        
+        let query = { studentId };
+        
+        if (startDate || endDate) {
+            query.createdAt = {};
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                query.createdAt.$gte = start;
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                query.createdAt.$lte = end;
+            }
+        }
+        
+        console.log("📅 Query:", JSON.stringify(query));
+        
+        const orders = await models_1.OrderModel.find(query)
+            .populate("stallId", "stallName stallPicture section")
+            .sort({ createdAt: -1 })
+            .lean();
+        
+        console.log(`📅 Found ${orders.length} orders`);
+        response.json({ orders });
+    } catch (error) {
+        console.error("Error fetching student orders with date range:", error);
+        response.status(500).json({ 
+            message: "Failed to fetch orders.",
+            error: error.message 
+        });
+    }
+});
+
 // ── GET STALL ORDERS ──────────────────────────────────────────────────
 orderRouter.get("/stall/:stallId", auth_1.authenticateRequest, async (request, response) => {
     const stallId = firstParam(request.params.stallId);
     
     try {
-        // Verify user has access to this stall
         const isAdmin = request.role === "admin";
         const isVendor = request.role === "vendor";
         
@@ -116,7 +157,6 @@ orderRouter.get("/:orderId", auth_1.authenticateRequest, async (request, respons
             return;
         }
 
-        // Check authorization
         const isStudent = order.studentId._id.toString() === request.userId;
         const isAdmin = request.role === "admin";
         
@@ -195,7 +235,6 @@ orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (reques
     }
 
     try {
-        // Verify authorization
         const order = await (0, order_controller_1.getOrderById)(orderId);
         if (!order) {
             return response.status(404).json({ message: "Order not found." });
@@ -216,7 +255,6 @@ orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (reques
             return response.status(403).json({ message: "Unauthorized to update payment." });
         }
 
-        // Only students can mark as paid, vendors/admin can mark as refunded
         if (paymentStatus === "paid" && !isStudent && !isAdmin) {
             return response.status(403).json({ message: "Only students can mark payment as paid." });
         }

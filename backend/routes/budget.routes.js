@@ -6,6 +6,7 @@ exports.budgetRouter = void 0;
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const budget_controller_1 = require("../controllers/budget.controller");
+const models_1 = require("../models");
 
 const budgetRouter = (0, express_1.Router)();
 exports.budgetRouter = budgetRouter;
@@ -22,6 +23,103 @@ budgetRouter.get("/", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("ad
     } catch (error) {
         console.error("Error fetching budgets:", error);
         response.status(500).json({ message: "Failed to fetch budgets." });
+    }
+});
+
+// ── GET STUDENT BUDGET CAPS ──────────────────────────────────────────────
+budgetRouter.get("/student/caps", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+    
+    try {
+        const student = await models_1.StudentModel.findById(studentId)
+            .select("budgetCap")
+            .lean();
+        
+        if (!student) {
+            return response.status(404).json({ message: "Student not found." });
+        }
+        
+        // Calculate spending for each budget cap
+        const now = new Date();
+        const budgetCapsWithSpending = await Promise.all((student.budgetCap || []).map(async (budget) => {
+            let sinceDate = budget.startDate;
+            if (budget.period === "daily") {
+                sinceDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (budget.period === "weekly") {
+                sinceDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            } else if (budget.period === "monthly") {
+                sinceDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            }
+            
+            const orders = await models_1.OrderModel.find({
+                studentId,
+                createdAt: { $gte: sinceDate },
+                orderStatus: { $ne: "cancelled" }
+            }).select("totalAmount");
+            
+            const spent = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+            const remaining = Math.max(0, budget.amount - spent);
+            
+            return {
+                ...budget,
+                spent,
+                remaining,
+                percentageUsed: budget.amount > 0 ? Math.min(100, (spent / budget.amount) * 100) : 0
+            };
+        }));
+        
+        response.json({ budgets: budgetCapsWithSpending });
+    } catch (error) {
+        console.error("Error fetching student budget caps:", error);
+        response.status(500).json({ message: "Failed to fetch budget caps." });
+    }
+});
+
+// ── CREATE STUDENT BUDGET CAP ────────────────────────────────────────────
+budgetRouter.post("/student/cap", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+    const { amount, period, startDate, endDate } = request.body;
+    
+    if (!amount || !startDate || !endDate) {
+        return response.status(400).json({ 
+            message: "Amount, start date, and end date are required." 
+        });
+    }
+    
+    try {
+        const student = await models_1.StudentModel.findById(studentId);
+        if (!student) {
+            return response.status(404).json({ message: "Student not found." });
+        }
+        
+        // Add budget cap to student
+        student.budgetCap.push({
+            amount,
+            period: period || "custom",
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            status: "active"
+        });
+        
+        await student.save();
+        
+        // Also create in Budget collection
+        const budget = await models_1.BudgetModel.create({
+            studentId,
+            studentTuptId: student.tuptId,
+            studentCourse: student.course,
+            amount,
+            duration: {
+                startDate: new Date(startDate),
+                endDate: new Date(endDate)
+            },
+            status: "active"
+        });
+        
+        response.status(201).json({ budget });
+    } catch (error) {
+        console.error("Error creating budget cap:", error);
+        response.status(500).json({ message: "Failed to create budget cap." });
     }
 });
 

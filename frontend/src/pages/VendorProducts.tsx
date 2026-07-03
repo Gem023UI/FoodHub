@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import "../styles/VendorProducts.css";
@@ -366,7 +365,6 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
   if (isLoading) {
     return (
       <div className="vendor-products-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-products-loading">
           <Loader />
         </div>
@@ -378,7 +376,6 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
   if (error && !stall) {
     return (
       <div className="vendor-products-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-products-error">
           <div className="error-icon">⚠️</div>
           <h2>No Stall Assigned</h2>
@@ -397,13 +394,6 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
 
   return (
     <div className="vendor-products-page">
-      <VendorHeader 
-        onNavigate={onNavigate} 
-        token={token} 
-        stallName={stall?.name}
-        onLogout={onLogout}
-      />
-
       <div className="vendor-products-container">
         <div className="vendor-products-header">
           <div className="header-left">

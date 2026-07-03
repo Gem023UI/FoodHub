@@ -68,3 +68,15 @@ export async function uploadVendorPicture(token: string, file: File): Promise<{ 
   if (!response.ok) throw new Error("Failed to upload picture");
   return response.json();
 }
+
+export async function uploadAdminPicture(token: string, file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append("profile", file);
+  const response = await fetch(`${apiBaseUrl}/users/profile/admin`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) throw new Error("Failed to upload picture");
+  return response.json();
+}

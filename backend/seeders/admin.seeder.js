@@ -1,65 +1,78 @@
 "use strict";
 
-// Load environment variables explicitly
-require("dotenv").config();
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const { AdminModel } = require("../models");
+require("dotenv/config");
 
-const adminData = {
-    firstName: "Admin",
-    lastName: "FoodHub",
-    email: "admin@foodhub.com",
-    contactNumber: "09123456780",
-    status: "verified",
-    role: "admin"
-};
+// ── Import Models ──────────────────────────────────────────────────────
+const { AdminModel } = require("../models/admin.model");
 
+// ── Configuration ──────────────────────────────────────────────────────
+const ADMIN_EMAIL = "admin@foodhub.com";
+const ADMIN_PASSWORD = "Admin@123456";
+const ADMIN_PROFILE_PICTURE = "https://res.cloudinary.com/dxnb2ozgw/image/upload/v1782987607/soda_ffr5rq.png";
+
+// ── Database Connection ────────────────────────────────────────────────
+async function connectDatabase() {
+    const mongoUri = process.env.MONGODB_URI || "mongodb://Jemuel:Student12345@ac-yxbmddu-shard-00-00.f3bxoif.mongodb.net:27017,ac-yxbmddu-shard-00-01.f3bxoif.mongodb.net:27017,ac-yxbmddu-shard-00-02.f3bxoif.mongodb.net:27017/FoodHub?ssl=true&replicaSet=atlas-xbkzgf-shard-0&authSource=admin&appName=Cluster0";
+    await mongoose.connect(mongoUri);
+    console.log("✅ Connected to MongoDB");
+}
+
+// ── Seed Admin ──────────────────────────────────────────────────────────
 async function seedAdmin() {
     try {
-        // Get MongoDB URI from environment or use fallback
-        const mongoUri = process.env.MONGO_URI || "mongodb://Jemuel:Student12345@ac-yxbmddu-shard-00-00.f3bxoif.mongodb.net:27017,ac-yxbmddu-shard-00-01.f3bxoif.mongodb.net:27017,ac-yxbmddu-shard-00-02.f3bxoif.mongodb.net:27017/FoodHub?ssl=true&replicaSet=atlas-xbkzgf-shard-0&authSource=admin&appName=Cluster0";
-        
-        console.log("🔌 Connecting to MongoDB...");
-        await mongoose.connect(mongoUri);
-        console.log("✅ Connected to MongoDB");
+        await connectDatabase();
 
-        // Check if admin already exists
-        const existingAdmin = await AdminModel.findOne({ email: adminData.email });
-        if (existingAdmin) {
-            console.log(`✅ Admin already exists: ${adminData.email}`);
-            console.log(`   🔑 Password: admin123`);
-            await mongoose.disconnect();
-            process.exit(0);
-        }
+        // ── 1. Clear existing admins ──────────────────────────────────────
+        console.log("🗑️ Removing all existing admin records...");
+        const deleteResult = await AdminModel.deleteMany({});
+        console.log(`✅ Deleted ${deleteResult.deletedCount} admin records`);
 
-        // Hash password
-        const passwordHash = await bcrypt.hash("admin123", 10);
+        // ── 2. Hash password ──────────────────────────────────────────────
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, salt);
 
-        // Create admin
+        // ── 3. Create new admin ───────────────────────────────────────────
+        console.log("📝 Creating new admin...");
         const admin = await AdminModel.create({
-            firstName: adminData.firstName,
-            lastName: adminData.lastName,
-            email: adminData.email,
-            passwordHash: passwordHash,
-            role: adminData.role,
-            status: adminData.status,
-            contactNumber: adminData.contactNumber
+            firstName: "FoodHub",
+            lastName: "Admin",
+            email: ADMIN_EMAIL,
+            passwordHash: hashedPassword,
+            contactNumber: "09123456789",
+            profilePictureUrl: ADMIN_PROFILE_PICTURE,
+            role: "admin",
+            status: "verified",
         });
 
-        console.log(`✅ Admin created successfully!`);
-        console.log(`   📧 Email: ${admin.email}`);
-        console.log(`   🔑 Password: admin123`);
-        console.log(`   👤 Name: ${admin.firstName} ${admin.lastName}`);
+        console.log("✅ Admin created successfully!");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("📧 Email:    ", ADMIN_EMAIL);
+        console.log("🔑 Password: ", ADMIN_PASSWORD);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("🖼️ Profile Picture:", ADMIN_PROFILE_PICTURE);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        await mongoose.disconnect();
-        console.log("✅ Disconnected from MongoDB");
-        process.exit(0);
+        // ── 4. Display admin details ──────────────────────────────────────
+        console.log("\n📋 Admin Details:");
+        console.log("   ID:        ", admin._id);
+        console.log("   Name:      ", `${admin.firstName} ${admin.lastName}`);
+        console.log("   Email:     ", admin.email);
+        console.log("   Role:      ", admin.role);
+        console.log("   Status:    ", admin.status);
+        console.log("   Contact:   ", admin.contactNumber);
+        console.log("   Picture:   ", admin.profilePictureUrl);
+
     } catch (error) {
-        console.error("❌ Seeding failed:", error);
-        await mongoose.disconnect();
+        console.error("❌ Error seeding admin:", error);
         process.exit(1);
+    } finally {
+        await mongoose.disconnect();
+        console.log("\n🔌 Disconnected from MongoDB");
+        process.exit(0);
     }
 }
 
+// ── Run Seeder ─────────────────────────────────────────────────────────
 seedAdmin();

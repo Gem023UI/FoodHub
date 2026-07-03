@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AdminHeader } from "../components/AdminHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getVendorInsights } from "../services/report.service";
@@ -50,7 +49,6 @@ export function AdminVendors({ token, onNavigate, onLogout }: AdminVendorsProps)
   if (isLoading) {
     return (
       <div className="admin-vendors-page">
-        <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="admin-vendors" />
         <div className="admin-loading">
           <Loader />
         </div>
@@ -61,8 +59,6 @@ export function AdminVendors({ token, onNavigate, onLogout }: AdminVendorsProps)
 
   return (
     <div className="admin-vendors-page">
-      <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="admin-vendors" />
-
       <div className="admin-vendors-container">
         <div className="admin-vendors-header">
           <div className="header-left">

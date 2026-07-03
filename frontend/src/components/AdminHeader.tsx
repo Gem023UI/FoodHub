@@ -29,7 +29,6 @@ export function AdminHeader({ onNavigate, token, onLogout, currentPage = "admin"
   return (
     <>
       <nav className="lp-nav admin-nav">
-        {/* Left: Logo + Brand */}
         <div
           className="lp-nav-brand"
           onClick={() => onNavigate("admin")}
@@ -39,7 +38,6 @@ export function AdminHeader({ onNavigate, token, onLogout, currentPage = "admin"
           <span className="lp-nav-brand-text">FoodHub Admin</span>
         </div>
 
-        {/* Center: Nav Links */}
         <ul className="lp-nav-links">
           {navLinks.map((link) => (
             <li key={link.id}>
@@ -53,13 +51,12 @@ export function AdminHeader({ onNavigate, token, onLogout, currentPage = "admin"
           ))}
         </ul>
 
-        {/* Right: Icons + Account */}
         <div className="lp-nav-right">
           <button
             className="lp-icon-btn"
             title="Profile"
             aria-label="Profile"
-            onClick={() => onNavigate("profile")}
+            onClick={() => onNavigate("admin-profile")}
           >
             <i className="fas fa-user-circle"></i>
           </button>
@@ -69,7 +66,6 @@ export function AdminHeader({ onNavigate, token, onLogout, currentPage = "admin"
         </div>
       </nav>
 
-      {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="modal-overlay" onClick={handleCancelLogout}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

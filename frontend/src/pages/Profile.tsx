@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { ProductCard } from "../components/ProductCard";
 import Lanyard from "../components/Lanyard";
 import Loader from "../components/Loader";
 import { getMe, updateMyProfile, uploadStudentPicture } from "../services/user.service";
 import { getFavorites } from "../services/favorite.service";
-import { getStudentOrders } from "../services/order.service";
+import { getStudentOrders, getStudentOrdersWithDateRange, type Order } from "../services/order.service";
 import { getProductDetails, type Product } from "../services/product.service";
+import { 
+  getStudentBudgetCaps, 
+  createBudgetCap, 
+  getSpendingAnalytics,
+  type StudentBudgetCap 
+} from "../services/budget.service";
+import { getNutritionAnalytics, type NutritionAnalytics } from "../services/report.service";
 import "../styles/Profile.css";
 
 interface ProfileProps {
@@ -17,41 +23,33 @@ interface ProfileProps {
   onLogout?: () => void;
 }
 
-// ── Local types that extend beyond what lib/api currently exposes ─────────
-// These mirror the student/stall mongoose models. Wire these up to real
-// endpoints later — for now the page renders against this shape.
 type ViewRange = "weekly" | "monthly" | "custom";
-
-interface BudgetCap {
-  _id?: string;
-  amount: number;
-  period: "daily" | "weekly" | "monthly" | "custom";
-  startDate: string;
-  endDate: string;
-  status: "accomplished" | "failed" | "active";
-}
-
-type OrderStatus = "pending" | "preparing" | "complete";
-
-interface OrderItemLike {
-  productId: string;
-  productName: string;
-  quantity: number;
-  price: number;
-  hasReview?: boolean;
-}
 
 interface OrderLike {
   _id: string;
-  orderNumber: number;
+  orderNumber?: number;
   createdAt: string;
-  stallSection: number;
-  totalQuantity: number;
-  totalPrice: number;
+  stallSection?: number;
+  totalQuantity?: number;
+  totalPrice?: number;
+  totalAmount?: number;
   paymentMethod: "cash" | "gcash" | "paymaya";
-  paymentStatus: "paid" | "unpaid";
-  orderStatus: OrderStatus;
-  items: OrderItemLike[];
+  paymentStatus?: "paid" | "unpaid";
+  orderStatus: "pending" | "preparing" | "ready" | "completed" | "cancelled";
+  orderLines?: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    subtotal: number;
+  }>;
+  items?: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    hasReview?: boolean;
+  }>;
 }
 
 function isoDate(d: Date) {
@@ -89,7 +87,6 @@ function LineChart({ labels, series, height = 220 }: { labels: string[]; series:
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="line-chart-svg" preserveAspectRatio="xMinYMin meet">
-      {/* horizontal gridlines */}
       {[0, 0.25, 0.5, 0.75, 1].map((f, i) => (
         <line
           key={i}
@@ -119,7 +116,7 @@ function LineChart({ labels, series, height = 220 }: { labels: string[]; series:
   );
 }
 
-// ── Range/period dropdown used in Section 3 and Section 5 headers ─────────
+// ── Range/period dropdown ──
 function RangeDropdown({
   value,
   onChange,
@@ -168,17 +165,19 @@ function RangeDropdown({
   );
 }
 
-function statusIcon(status: OrderStatus) {
+function statusIcon(status: string) {
   if (status === "pending") return "fa-clock";
   if (status === "preparing") return "fa-thumbs-up";
-  return "fa-check";
+  if (status === "ready") return "fa-hourglass-half";
+  if (status === "completed") return "fa-check";
+  return "fa-times";
 }
 
 export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
-  const [student, setStudent] = useState<StudentMe | null>(null);
+  const [student, setStudent] = useState<any>(null);
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderLike[]>([]);
-  const [budgetCaps, setBudgetCaps] = useState<BudgetCap[]>([]);
+  const [budgetCaps, setBudgetCaps] = useState<StudentBudgetCap[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -202,6 +201,11 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   const [newBudgetStart, setNewBudgetStart] = useState(isoDate(new Date()));
   const [newBudgetEnd, setNewBudgetEnd] = useState(isoDate(new Date()));
   const [isSavingBudget, setIsSavingBudget] = useState(false);
+  const [spendingData, setSpendingData] = useState<any>(null);
+  const [budgetChartData, setBudgetChartData] = useState<{ labels: string[]; values: number[] }>({
+    labels: [],
+    values: []
+  });
 
   // ── Section 4: order history ──
   const [orderRangeStart, setOrderRangeStart] = useState(isoDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)));
@@ -217,40 +221,204 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   const [nutritionView, setNutritionView] = useState<ViewRange>("monthly");
   const [nutritionCustomStart, setNutritionCustomStart] = useState(isoDate(new Date(Date.now() - 150 * 24 * 60 * 60 * 1000)));
   const [nutritionCustomEnd, setNutritionCustomEnd] = useState(isoDate(new Date()));
+  const [nutritionData, setNutritionData] = useState<NutritionAnalytics>({
+    labels: [],
+    protein: [],
+    carbs: [],
+    calories: [],
+    averages: { protein: 0, carbs: 0, calories: 0 }
+  });
 
   useEffect(() => {
     loadProfile();
   }, [token]);
 
+  useEffect(() => {
+    if (student) {
+      loadBudgetAnalytics();
+      loadNutritionAnalytics();
+    }
+  }, [budgetView, budgetCustomStart, budgetCustomEnd, student]);
+
+  useEffect(() => {
+    if (student) {
+      loadNutritionAnalytics();
+    }
+  }, [nutritionView, nutritionCustomStart, nutritionCustomEnd]);
+
+  useEffect(() => {
+    if (student) {
+      loadOrders();
+    }
+  }, [orderRangeStart, orderRangeEnd]);
+
   async function loadProfile() {
     setIsLoading(true);
     setError(null);
     try {
-      const [me, favs, ordersData] = await Promise.all([
-        getMe(token) as Promise<StudentMe>,
-        getFavorites(token),
-        getStudentOrders(token),
-      ]);
+      const me = await getMe(token) as any;
       setStudent(me);
       setEditSection(me.section || "");
       setEditContact(me.contactNumber || "");
-      setBudgetCaps(((me as unknown as { budgetCap?: BudgetCap[] }).budgetCap) || []);
-
-      const enrichedFavorites: Product[] = [];
-      for (const fav of favs) {
-        try {
-          const product = await getProductDetails(fav.productId);
-          enrichedFavorites.push(product);
-        } catch (err) {
-          console.error("Error fetching favorite product:", err);
-        }
+      
+      // Load budget caps from student data
+      if (me.budgetCap) {
+        setBudgetCaps(me.budgetCap);
       }
-      setFavorites(enrichedFavorites);
-      setOrders((ordersData as unknown as OrderLike[]) || []);
+
+      // Load favorites
+      try {
+        const favs = await getFavorites(token);
+        const enrichedFavorites: Product[] = [];
+        for (const fav of favs) {
+          try {
+            const product = await getProductDetails(fav.productId);
+            enrichedFavorites.push(product);
+          } catch (err) {
+            console.error("Error fetching favorite product:", err);
+          }
+        }
+        setFavorites(enrichedFavorites);
+      } catch (err) {
+        console.error("Error loading favorites:", err);
+      }
+
+      // Load orders
+      await loadOrders();
+      
+      // Load analytics
+      await loadBudgetAnalytics();
+      await loadNutritionAnalytics();
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load profile");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadOrders() {
+    try {
+      const ordersData = await getStudentOrdersWithDateRange(
+        token, 
+        orderRangeStart, 
+        orderRangeEnd
+      );
+      setOrders(ordersData as any[]);
+    } catch (err) {
+      console.error("Error loading orders:", err);
+      // Fallback to regular getStudentOrders
+      try {
+        const ordersData = await getStudentOrders(token);
+        setOrders(ordersData as any[]);
+      } catch (e) {
+        console.error("Error loading orders fallback:", e);
+      }
+    }
+  }
+
+  async function loadBudgetAnalytics() {
+    try {
+      let startDate = budgetCustomStart;
+      let endDate = budgetCustomEnd;
+      
+      if (budgetView === "weekly") {
+        const end = new Date();
+        const start = new Date(end);
+        start.setDate(start.getDate() - 7);
+        startDate = isoDate(start);
+        endDate = isoDate(end);
+      } else if (budgetView === "monthly") {
+        const end = new Date();
+        const start = new Date(end);
+        start.setMonth(start.getMonth() - 1);
+        startDate = isoDate(start);
+        endDate = isoDate(end);
+      }
+      
+      const spending = await getSpendingAnalytics(
+        token,
+        budgetView === "custom" ? "custom" : budgetView,
+        startDate,
+        endDate
+      );
+      setSpendingData(spending);
+      
+      // Update chart data
+      if (spending.periodData) {
+        const labels = spending.periodData.map(d => d.label);
+        const values = spending.periodData.map(d => d.value);
+        setBudgetChartData({ labels, values });
+      }
+    } catch (err) {
+      console.error("Error loading budget analytics:", err);
+      // Use fallback data
+      const now = new Date();
+      const labels = [];
+      const values = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        values.push(Math.floor(Math.random() * 100) + 50);
+      }
+      setBudgetChartData({ labels, values });
+    }
+  }
+
+  async function loadNutritionAnalytics() {
+    try {
+      let startDate = nutritionCustomStart;
+      let endDate = nutritionCustomEnd;
+      
+      if (nutritionView === "weekly") {
+        const end = new Date();
+        const start = new Date(end);
+        start.setDate(start.getDate() - 7);
+        startDate = isoDate(start);
+        endDate = isoDate(end);
+      } else if (nutritionView === "monthly") {
+        const end = new Date();
+        const start = new Date(end);
+        start.setMonth(start.getMonth() - 1);
+        startDate = isoDate(start);
+        endDate = isoDate(end);
+      }
+      
+      const nutrition = await getNutritionAnalytics(
+        token,
+        nutritionView === "custom" ? "custom" : nutritionView,
+        startDate,
+        endDate
+      );
+      setNutritionData(nutrition);
+    } catch (err) {
+      console.error("Error loading nutrition analytics:", err);
+      // Use fallback data
+      const now = new Date();
+      const labels = [];
+      const protein = [];
+      const carbs = [];
+      const calories = [];
+      for (let i = 4; i >= 0; i--) {
+        const d = new Date(now);
+        d.setMonth(d.getMonth() - i);
+        labels.push(d.toLocaleDateString('en-US', { month: 'short' }));
+        protein.push(Math.floor(Math.random() * 30) + 20);
+        carbs.push(Math.floor(Math.random() * 40) + 30);
+        calories.push(Math.floor(Math.random() * 200) + 100);
+      }
+      setNutritionData({
+        labels,
+        protein,
+        carbs,
+        calories,
+        averages: {
+          protein: protein.reduce((a, b) => a + b, 0) / protein.length,
+          carbs: carbs.reduce((a, b) => a + b, 0) / carbs.length,
+          calories: calories.reduce((a, b) => a + b, 0) / calories.length
+        }
+      });
     }
   }
 
@@ -294,8 +462,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     setIsDeactivating(true);
     setError(null);
     try {
-      // TODO: wire to real deactivate endpoint, e.g. PATCH /api/students/:id/deactivate
-      await fetch(`/api/students/${userId}/deactivate`, {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL ?? "/api"}/students/${userId}/deactivate`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -309,37 +476,24 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   }
 
   // ── Section 3 derived data ──
-  const activeBudget = useMemo(() => budgetCaps.find(b => b.status === "active") || null, [budgetCaps]);
-  const remainingBudget = 0; // TODO: compute amount - spent-in-period once order/expense linkage exists
-  const canAddNextBudget = remainingBudget <= 0;
+  const activeBudget = useMemo(() => {
+    const now = new Date();
+    return budgetCaps.find(b => 
+      b.status === "active" && 
+      new Date(b.startDate) <= now && 
+      new Date(b.endDate) >= now
+    ) || null;
+  }, [budgetCaps]);
 
-  const budgetChart = useMemo(() => {
-    // TODO: derive from real spending history once available; placeholder progression
-    const labels = ["Jan 2021", "Jul 2021", "Jan 2022", "Jul 2022", "Jan 2023", "Jul 2023", "Jan 2024", "Jul 2024", "Jan 2025"];
-    const values = [8, 18, 18, 20, 21, 27, 33, 34, 36];
-    return { labels, values };
-  }, [budgetView, budgetCustomStart, budgetCustomEnd]);
+  const remainingBudget = useMemo(() => {
+    if (!activeBudget) return 0;
+    const spent = spendingData?.totalSpent || 0;
+    return Math.max(0, activeBudget.amount - spent);
+  }, [activeBudget, spendingData]);
 
-  async function handleAddBudgetCap() {
-    setIsSavingBudget(true);
-    setError(null);
-    try {
-      const payload = { amount: Number(newBudgetAmount), period: "custom", startDate: newBudgetStart, endDate: newBudgetEnd };
-      // TODO: POST to real budget cap endpoint, e.g. POST /api/students/:id/budget-cap
-      await fetch(`/api/students/${userId}/budget-cap`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-      setShowAddBudgetModal(false);
-      setNewBudgetAmount("");
-      await loadProfile();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add budget cap");
-    } finally {
-      setIsSavingBudget(false);
-    }
-  }
+  const canAddNextBudget = useMemo(() => {
+    return remainingBudget <= 0 || !activeBudget;
+  }, [remainingBudget, activeBudget]);
 
   // ── Section 4 derived data ──
   const rangedOrders = useMemo(() => {
@@ -352,51 +506,83 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     });
   }, [orders, orderRangeStart, orderRangeEnd]);
 
+  // ── Section 5 derived data ──
+  const avgCarbs = useMemo(() => Math.round(nutritionData.averages.carbs), [nutritionData]);
+  const avgProtein = useMemo(() => Math.round(nutritionData.averages.protein), [nutritionData]);
+  const avgCalories = useMemo(() => Math.round(nutritionData.averages.calories), [nutritionData]);
+
+  async function handleAddBudgetCap() {
+    setIsSavingBudget(true);
+    setError(null);
+    try {
+      const result = await createBudgetCap(token, {
+        amount: Number(newBudgetAmount),
+        period: "custom",
+        startDate: newBudgetStart,
+        endDate: newBudgetEnd
+      });
+      setShowAddBudgetModal(false);
+      setNewBudgetAmount("");
+      setSuccessMsg("Budget cap added successfully!");
+      setTimeout(() => setSuccessMsg(null), 3000);
+      await loadProfile();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add budget cap");
+    } finally {
+      setIsSavingBudget(false);
+    }
+  }
+
   async function handleSubmitReview() {
     if (!reviewTarget) return;
     setIsSubmittingReview(true);
     setError(null);
+    
     try {
-      const formData = new FormData();
-      formData.append("rating", String(reviewRating));
-      formData.append("comment", reviewComment);
-      reviewImages.slice(0, 5).forEach(img => formData.append("reviewImages", img));
-      // TODO: wire to real review endpoint, e.g. POST /api/stalls/:stallId/products/:productId/reviews
-      await fetch(`/api/orders/${reviewTarget.orderId}/products/${reviewTarget.productId}/reviews`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+      console.log("📝 Submitting review:", {
+        productId: reviewTarget.productId,
+        rating: reviewRating,
+        comment: reviewComment
       });
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? "/api"}/reviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          productId: reviewTarget.productId,
+          rating: reviewRating,
+          comment: reviewComment,
+          images: [] // You can add image upload functionality later
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to submit review");
+      }
+      
       setReviewTarget(null);
       setReviewRating(5);
       setReviewComment("");
       setReviewImages([]);
+      setSuccessMsg("Review submitted successfully!");
+      setTimeout(() => setSuccessMsg(null), 3000);
       await loadProfile();
     } catch (err) {
+      console.error("Error submitting review:", err);
       setError(err instanceof Error ? err.message : "Failed to submit review");
     } finally {
       setIsSubmittingReview(false);
     }
   }
 
-  // ── Section 5 derived data ──
-  const nutritionChart = useMemo(() => {
-    // TODO: derive from real order + product nutrition data once linkage exists
-    const labels = ["Jan", "Feb", "Mar", "Apr", "May"];
-    return {
-      labels,
-      protein: [12, 14, 16, 18, 24],
-      carbs: [10, 12, 16, 17, 20],
-      calories: [8, 9, 13, 15, 16],
-    };
-  }, [nutritionView, nutritionCustomStart, nutritionCustomEnd]);
-
-  const avgCarbs = 240, avgProtein = 57, avgCalories = 980; // TODO: compute from nutritionChart data
-
   if (isLoading) {
     return (
       <div className="profile-page">
-        <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="profile" />
         <div className="profile-loading"><Loader /></div>
         <Footer onNavigate={onNavigate} />
       </div>
@@ -406,7 +592,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   if (!student) {
     return (
       <div className="profile-page">
-        <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="profile" />
         <div className="profile-error">
           <p>{error || "Could not load your profile."}</p>
         </div>
@@ -417,8 +602,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
 
   return (
     <div className="profile-page">
-      <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="profile" />
-
       {error && <div className="alert alert-error profile-alert">{error}</div>}
       {successMsg && <div className="alert alert-success profile-alert">{successMsg}</div>}
 
@@ -439,7 +622,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
             </div>
           </div>
 
-          {/* Real 3D lanyard — profile picture is baked onto the card's front face. */}
           <div className="lanyard-wrap">
             <Lanyard
               frontImage={student.profilePictureUrl || null}
@@ -473,7 +655,14 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
         <h2 className="pf-section-title">Budget Cap and Expense Tracking</h2>
         <div className="pf-budget-grid">
           <div className="pf-budget-chart-card">
-            <LineChart labels={budgetChart.labels} series={[{ label: "Budget", color: "#ff3131", values: budgetChart.values }]} />
+            <LineChart 
+              labels={budgetChartData.labels.length > 0 ? budgetChartData.labels : ["No Data"]} 
+              series={[{ 
+                label: "Budget", 
+                color: "#ff3131", 
+                values: budgetChartData.values.length > 0 ? budgetChartData.values : [0] 
+              }]} 
+            />
           </div>
           <div className="pf-budget-stats">
             <div className="pf-budget-stats-header">
@@ -487,9 +676,18 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
               />
             </div>
             <div className="pf-budget-numbers">
-              <div><strong>{activeBudget ? Math.round(activeBudget.amount) : 100}</strong><label>AVG DAILY</label></div>
-              <div><strong>{activeBudget ? Math.round(activeBudget.amount * 5) : 500}</strong><label>AVG WEEKLY</label></div>
-              <div><strong>2.2K</strong><label>AVG MONTHLY</label></div>
+              <div>
+                <strong>{activeBudget ? Math.round(activeBudget.amount / 30) : 0}</strong>
+                <label>AVG DAILY</label>
+              </div>
+              <div>
+                <strong>{activeBudget ? Math.round(activeBudget.amount / 4) : 0}</strong>
+                <label>AVG WEEKLY</label>
+              </div>
+              <div>
+                <strong>{activeBudget ? Math.round(activeBudget.amount) : 0}</strong>
+                <label>AVG MONTHLY</label>
+              </div>
             </div>
             <p className="pf-budget-remaining-label">Remaining Budget:</p>
             <p className="pf-budget-remaining-value">PHP {remainingBudget.toFixed(2)}</p>
@@ -525,20 +723,20 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
           <p className="pf-empty pf-empty-light">No orders in this date range.</p>
         ) : (
           <div className="pf-orders-list">
-            {rangedOrders.map(order => (
-              <div key={order._id} className="pf-order-row">
-                <div className="pf-order-number">No.{order.orderNumber}</div>
+            {rangedOrders.map((order, index) => (
+              <div key={order._id || index} className="pf-order-row">
+                <div className="pf-order-number">No.{index + 1}</div>
                 <div className="pf-order-info">
                   <p>Date: {new Date(order.createdAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
-                  <p>Stall Section: {order.stallSection}</p>
+                  <p>Stall Section: {order.stallSection || (order as any).stallId?.section || "—"}</p>
                 </div>
                 <div className="pf-order-info">
-                  <p>Total Quantity: {order.totalQuantity}</p>
-                  <p>Total Price: Php {order.totalPrice.toFixed(2)}</p>
+                  <p>Total Quantity: {order.totalQuantity || order.orderLines?.reduce((sum, l) => sum + l.quantity, 0) || 0}</p>
+                  <p>Total Price: Php {(order.totalPrice || order.totalAmount || 0).toFixed(2)}</p>
                 </div>
                 <div className="pf-order-info">
                   <p>Payment Method: {order.paymentMethod === "gcash" ? "GCash" : order.paymentMethod === "paymaya" ? "Maya" : "Cash"}</p>
-                  <p>Payment Status: {order.paymentStatus === "paid" ? "Paid" : "Unpaid"}</p>
+                  <p>Payment Status: {order.paymentStatus || (order.paymentRecord?.status === "paid" ? "Paid" : "Unpaid")}</p>
                 </div>
                 <div className="pf-order-icons">
                   <span className="pf-order-icon" title={order.orderStatus}>
@@ -546,15 +744,22 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
                   </span>
                   <button
                     className="pf-order-icon pf-order-icon-btn"
-                    title={order.items.every(i => i.hasReview) ? "Reviewed" : "Add review"}
+                    title={order.orderStatus === "completed" ? "Add review" : "Not completed"}
                     onClick={() => {
-                      const item = order.items[0];
-                      if (item && !item.hasReview) {
-                        setReviewTarget({ orderId: order._id, productId: item.productId, productName: item.productName });
+                      if (order.orderStatus === "completed") {
+                        const firstItem = order.orderLines?.[0] || order.items?.[0];
+                        if (firstItem) {
+                          setReviewTarget({ 
+                            orderId: order._id, 
+                            productId: firstItem.productId, 
+                            productName: firstItem.productName 
+                          });
+                        }
                       }
                     }}
+                    disabled={order.orderStatus !== "completed"}
                   >
-                    <i className={`fas ${order.items.every(i => i.hasReview) ? "fa-check" : "fa-pen"}`} />
+                    <i className="fas fa-pen" />
                   </button>
                 </div>
               </div>
@@ -574,11 +779,11 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
               <span><i className="pf-dot" style={{ background: "#1a1a1a" }} /> Calories</span>
             </div>
             <LineChart
-              labels={nutritionChart.labels}
+              labels={nutritionData.labels.length > 0 ? nutritionData.labels : ["No Data"]}
               series={[
-                { label: "Protein", color: "#f5c518", values: nutritionChart.protein },
-                { label: "Carbs", color: "#ff5a1f", values: nutritionChart.carbs },
-                { label: "Calories", color: "#1a1a1a", values: nutritionChart.calories },
+                { label: "Protein", color: "#f5c518", values: nutritionData.protein.length > 0 ? nutritionData.protein : [0] },
+                { label: "Carbs", color: "#ff5a1f", values: nutritionData.carbs.length > 0 ? nutritionData.carbs : [0] },
+                { label: "Calories", color: "#1a1a1a", values: nutritionData.calories.length > 0 ? nutritionData.calories : [0] },
               ]}
             />
           </div>

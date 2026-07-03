@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getStalls, getStallDetails, getStallProductsByCategory } from "../services/stall.service";
@@ -101,7 +100,6 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
   if (isLoading) {
     return (
       <div className="stalls-page">
-        <Header onNavigate={onNavigate} token={token} />
         <div className="stalls-loading">
           <Loader />
         </div>
@@ -112,8 +110,6 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
 
   return (
     <div className="stalls-page">
-      <Header onNavigate={onNavigate} token={token} currentPage="stalls" />
-
       <div className="stalls-container">
         <h1 className="stalls-title">Canteen Map</h1>
         <p className="stalls-subtitle">Click a section to view available stalls</p>

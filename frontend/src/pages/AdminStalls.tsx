@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AdminHeader } from "../components/AdminHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getStalls, createStall, updateStall, deleteStall } from "../services/stall.service";
@@ -152,7 +151,6 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
   if (isLoading) {
     return (
       <div className="admin-stalls-page">
-        <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="admin-stalls" />
         <div className="admin-loading">
           <Loader />
         </div>
@@ -163,8 +161,6 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
 
   return (
     <div className="admin-stalls-page">
-      <AdminHeader onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="admin-stalls" />
-
       <div className="admin-stalls-container">
         <div className="admin-stalls-header">
           <div className="header-left">

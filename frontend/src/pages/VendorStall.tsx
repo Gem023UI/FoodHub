@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getVendorStall, getStallVendors } from "../services/stall.service";
@@ -80,7 +79,6 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
   if (isLoading) {
     return (
       <div className="vendor-stall-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-loading">
           <Loader />
         </div>
@@ -92,12 +90,6 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
   if (error || !stall) {
     return (
       <div className="vendor-stall-page">
-        <VendorHeader 
-          onNavigate={onNavigate} 
-          token={token} 
-          stallName={undefined}
-          onLogout={onLogout}
-        />
         <div className="vendor-error-container">
           <div className="error-icon">⚠️</div>
           <h2>No Stall Assigned</h2>
@@ -115,14 +107,6 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
 
   return (
     <div className="vendor-stall-page">
-      <VendorHeader 
-        onNavigate={onNavigate} 
-        token={token} 
-        stallName={stall.stallName}
-        onLogout={onLogout}
-        currentPage="vendor-stall"
-      />
-      
       {/* Hero Section */}
       <div 
         className="vendor-hero" 

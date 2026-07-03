@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import "../styles/VendorProfile.css";
@@ -153,7 +152,6 @@ export function VendorProfile({
   if (isLoading) {
     return (
       <div className="vendor-profile-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-profile-loading">
           <Loader />
         </div>
@@ -165,7 +163,6 @@ export function VendorProfile({
   if (!profile) {
     return (
       <div className="vendor-profile-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-profile-error">
           <p>Profile not found.</p>
           <button onClick={() => onNavigate("vendor-stall")}>Go Back</button>
@@ -181,8 +178,6 @@ export function VendorProfile({
 
   return (
     <div className="vendor-profile-page">
-      <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
-
       {error && <div className="alert alert-error vp-alert">{error}</div>}
       {successMsg && <div className="alert alert-success vp-alert">{successMsg}</div>}
 

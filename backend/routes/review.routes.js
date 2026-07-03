@@ -21,10 +21,13 @@ reviewsRouter.get("/product/:productId", async (request, response) => {
 
     try {
         const reviews = await (0, review_controller_1.getReviewsByProduct)(productId);
-        response.json({ reviews });
+        response.json({ reviews: reviews || [] });
     } catch (error) {
         console.error("Error fetching reviews:", error);
-        response.status(500).json({ message: "Failed to fetch reviews." });
+        response.status(500).json({ 
+            message: "Failed to fetch reviews.",
+            error: error.message 
+        });
     }
 });
 
@@ -33,20 +36,26 @@ reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) =>
     const { productId, rating, comment, images } = request.body;
     const studentId = request.userId;
 
+    console.log("📝 Review request:", { studentId, productId, rating, comment });
+
     if (!productId || !rating) {
-        return response.status(400).json({ message: "productId and rating are required." });
+        return response.status(400).json({ 
+            message: "productId and rating are required." 
+        });
     }
 
     if (rating < 1 || rating > 5) {
-        return response.status(400).json({ message: "Rating must be between 1 and 5." });
+        return response.status(400).json({ 
+            message: "Rating must be between 1 and 5." 
+        });
     }
 
     try {
         const result = await (0, review_controller_1.createReview)({
             studentId,
             productId,
-            rating,
-            comment,
+            rating: Number(rating),
+            comment: comment || "",
             images: images || []
         });
 
@@ -58,13 +67,18 @@ reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) =>
                 already_reviewed: "You have already reviewed this product.",
                 product_not_found: "Product not found."
             };
-            return response.status(400).json({ message: messages[result.reason] || "Failed to create review." });
+            return response.status(400).json({ 
+                message: messages[result.reason] || "Failed to create review." 
+            });
         }
 
         response.status(201).json({ review: result.data.review });
     } catch (error) {
         console.error("Error creating review:", error);
-        response.status(500).json({ message: "Failed to create review." });
+        response.status(500).json({ 
+            message: "Failed to create review.",
+            error: error.message 
+        });
     }
 });
 
@@ -72,14 +86,26 @@ reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) =>
 reviewsRouter.delete("/:productId/:reviewId", auth_1.authenticateRequest, async (request, response) => {
     const productId = firstParam(request.params.productId);
     const reviewId = firstParam(request.params.reviewId);
-    if (!productId || !reviewId) return response.status(400).json({ message: "Invalid review reference." });
+    
+    if (!productId || !reviewId) {
+        return response.status(400).json({ message: "Invalid review reference." });
+    }
 
     try {
         const result = await (0, review_controller_1.deleteReview)(productId, reviewId);
-        if (!result.success) return response.status(404).json({ message: "Review not found." });
+        
+        if (!result.success) {
+            return response.status(404).json({ 
+                message: result.reason === "not_found" ? "Review not found." : "Failed to delete review." 
+            });
+        }
+        
         response.status(204).send();
     } catch (error) {
         console.error("Error deleting review:", error);
-        response.status(500).json({ message: "Failed to delete review." });
+        response.status(500).json({ 
+            message: "Failed to delete review.",
+            error: error.message 
+        });
     }
 });

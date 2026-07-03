@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { toggleFavorite, checkFavorite, getFavorites } from "../services/favorite.service";
@@ -196,7 +195,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
   if (isLoading) {
     return (
       <div className="product-page">
-        <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="home" />
         <div className="product-loading">
           <Loader />
         </div>

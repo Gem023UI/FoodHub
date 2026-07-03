@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { loginUser, registerStudent, verifyEmail, resendVerification } from "../services/auth.service";
 import tupLogo from "../../images/Logo.png";
@@ -246,8 +245,6 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
 
   return (
     <div className="auth-page">
-      <Header onNavigate={onNavigate} />
-
       <div className="auth-content">
         <div className="auth-card">
           <div className="auth-card-brand">

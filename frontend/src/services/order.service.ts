@@ -8,6 +8,12 @@ export interface OrderLine {
   price: number;
   quantity: number;
   subtotal: number;
+  nutrition?: {
+    calories: number | null;
+    protein: number | null;
+    carbs: number | null;
+    allergen: string;
+  };
 }
 
 export interface PaymentRecord {
@@ -82,6 +88,38 @@ export async function getStudentOrders(token: string): Promise<Order[]> {
   if (!response.ok) throw new Error("Failed to fetch orders");
   const data = await response.json() as { orders: Order[] };
   return data.orders;
+}
+
+export async function getStudentOrdersWithDateRange(
+  token: string, 
+  startDate?: string, 
+  endDate?: string
+): Promise<Order[]> {
+  const params = new URLSearchParams();
+  if (startDate) params.append("startDate", startDate);
+  if (endDate) params.append("endDate", endDate);
+  
+  const url = `${apiBaseUrl}/orders/student/range${params.toString() ? `?${params.toString()}` : ''}`;
+  console.log("📅 Fetching orders with date range:", url);
+  
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Error response:", errorText);
+      throw new Error(`Failed to fetch orders: ${response.status}`);
+    }
+    
+    const data = await response.json() as { orders: Order[] };
+    return data.orders;
+  } catch (error) {
+    console.error("❌ Error in getStudentOrdersWithDateRange:", error);
+    // Fallback to regular getStudentOrders
+    return getStudentOrders(token);
+  }
 }
 
 export async function getStallOrders(token: string, stallId: string, status?: string): Promise<Order[]> {

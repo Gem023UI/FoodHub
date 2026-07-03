@@ -21,6 +21,8 @@ interface ProductCardProps {
     available?: boolean;
     stallName?: string;
     stallId?: string;
+    averageRating?: number;
+    reviewCount?: number;
   };
   token?: string;
   onClick: () => void;
@@ -33,6 +35,32 @@ const CATEGORY_COLOR: Record<string, string> = {
   "Beverage": "yellow",
   "Add-ons": "gray",
 };
+
+// Function to render star rating
+function renderStars(rating: number = 0) {
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+  
+  let stars = [];
+  
+  // Full stars
+  for (let i = 0; i < fullStars; i++) {
+    stars.push(<i key={`full-${i}`} className="fas fa-star star-filled"></i>);
+  }
+  
+  // Half star
+  if (hasHalfStar) {
+    stars.push(<i key="half" className="fas fa-star-half-alt star-half"></i>);
+  }
+  
+  // Empty stars
+  for (let i = 0; i < emptyStars; i++) {
+    stars.push(<i key={`empty-${i}`} className="far fa-star star-empty"></i>);
+  }
+  
+  return stars;
+}
 
 export function ProductCard({ product, token, onClick }: ProductCardProps) {
   const [isFavorited, setIsFavorited] = useState(false);
@@ -71,6 +99,10 @@ export function ProductCard({ product, token, onClick }: ProductCardProps) {
     : "https://via.placeholder.com/200x200?text=No+Image";
 
   const colorClass = CATEGORY_COLOR[product.category || ""] || "red";
+  
+  // Get rating and review count
+  const averageRating = product.averageRating || 0;
+  const reviewCount = product.reviewCount || 0;
 
   return (
     <div className={`product-card product-card-${colorClass}`} onClick={onClick}>
@@ -97,6 +129,19 @@ export function ProductCard({ product, token, onClick }: ProductCardProps) {
           <p className="product-card-stall">{product.stallName}</p>
         )}
         <p className="product-card-price">Php.{product.price.toFixed(2)}</p>
+
+        {/* Rating Section */}
+        <div className="product-card-rating">
+          <div className="stars-container">
+            {renderStars(averageRating)}
+          </div>
+          {reviewCount > 0 && (
+            <span className="review-count">({reviewCount})</span>
+          )}
+          {reviewCount === 0 && (
+            <span className="no-reviews">No reviews</span>
+          )}
+        </div>
 
         <div className="product-card-nutrition">
           <div>

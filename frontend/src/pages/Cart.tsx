@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getStallDetails } from "../services/stall.service";
@@ -190,7 +189,6 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
   if (isLoading) {
     return (
       <div className="cart-page">
-        <Header onNavigate={onNavigate} token={token} />
         <div className="cart-loading">
           <Loader />
         </div>
@@ -201,8 +199,6 @@ export function Cart({ token, onNavigate, onLogout }: CartProps) {
 
   return (
     <div className="cart-page">
-      <Header onNavigate={onNavigate} token={token} />
-
       <div className="cart-container">
         <div className="cart-header">
           <h1>Your Cart</h1>

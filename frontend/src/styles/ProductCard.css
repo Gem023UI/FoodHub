@@ -85,3 +85,45 @@
 .product-card-nutrition div { text-align: center; }
 .product-card-nutrition span { display: block; font-weight: 800; font-size: 13px; }
 .product-card-nutrition label { display: block; font-size: 10px; opacity: 0.85; }
+
+/* ── Rating Stars ────────────────────────────────────────────────────── */
+.product-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+}
+
+.stars-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stars-container .star-filled {
+  color: #f5c518;
+  font-size: 13px;
+}
+
+.stars-container .star-half {
+  color: #f5c518;
+  font-size: 13px;
+}
+
+.stars-container .star-empty {
+  color: #d3d3d3;
+  font-size: 13px;
+}
+
+.review-count {
+  font-size: 12px;
+  color: #666;
+  margin-left: 2px;
+}
+
+.no-reviews {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}

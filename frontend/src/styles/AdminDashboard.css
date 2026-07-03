@@ -6,7 +6,7 @@
 }
 
 .admin-dashboard-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 32px 20px;
   flex: 1;
@@ -103,6 +103,197 @@
   font-size: 12px;
   color: #a6a6a6;
   margin-top: 2px;
+}
+
+/* Dashboard Sections */
+.dashboard-section {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 32px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.section-header h2 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.period-selector {
+  display: flex;
+  gap: 6px;
+  background: #f5f5f5;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.period-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+
+.period-btn:hover {
+  background: rgba(255, 49, 49, 0.1);
+  color: #ff3131;
+}
+
+.period-btn.active {
+  background: #ff3131;
+  color: white;
+}
+
+/* Charts Grid */
+.charts-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.charts-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+}
+
+.chart-container {
+  background: #fafaf8;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #f0f0f0;
+}
+
+.chart-container h3 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.chart-total {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin-top: 12px;
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Stall Cards */
+.stall-cards-container {
+  grid-column: span 1;
+}
+
+.stall-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.stall-cards-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.stall-cards-grid::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.stall-cards-grid::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.stall-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.2s;
+}
+
+.stall-card:hover {
+  border-color: #ff3131;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.stall-card-image {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.stall-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stall-card-info h4 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stall-card-info p {
+  font-size: 12px;
+  color: #999;
+  margin: 0 0 6px 0;
+}
+
+.stall-card-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+}
+
+.stall-card-stats span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Quick Actions */
@@ -234,6 +425,31 @@
   color: #721c24;
 }
 
+/* Responsive */
+@media (max-width: 1200px) {
+  .charts-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .charts-grid-3 .chart-container:last-child {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 992px) {
+  .charts-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .stall-cards-container {
+    grid-column: span 1;
+  }
+  
+  .stall-cards-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .admin-dashboard-container {
     padding: 20px 12px;
@@ -243,8 +459,25 @@
     grid-template-columns: 1fr 1fr;
   }
   
+  .charts-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  
+  .charts-grid-3 .chart-container:last-child {
+    grid-column: span 1;
+  }
+  
+  .stall-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  
   .quick-actions-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -255,5 +488,14 @@
   
   .quick-actions-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .period-selector {
+    width: 100%;
+  }
+  
+  .period-btn {
+    flex: 1;
+    text-align: center;
   }
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { getVendorStall } from "../services/stall.service";
@@ -193,7 +192,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
   if (isLoading) {
     return (
       <div className="vendor-revenue-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-revenue-loading">
           <Loader />
         </div>
@@ -208,8 +206,6 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
 
   return (
     <div className="vendor-revenue-page">
-      <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
-
       <div className="vendor-revenue-container">
         <div className="vendor-revenue-header">
           <h1>Revenue Analytics</h1>

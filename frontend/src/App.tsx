@@ -4,209 +4,244 @@ import { Login } from "./pages/Login";
 import { Stalls } from "./pages/Stalls";
 import { Product } from "./pages/Product";
 import { Cart } from "./pages/Cart";
-import { Preorder } from "./pages/PreOrder";
+import Preorder from "./pages/PreOrder";
 import { Profile } from "./pages/Profile";
-import { AboutUs } from "./pages/AboutUs";
-import Trends from "./pages/Trends";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { AdminStalls } from "./pages/AdminStalls";
 import { AdminVendors } from "./pages/AdminVendors";
 import { AdminStudents } from "./pages/AdminStudents";
+import { AdminProfile } from "./pages/AdminProfile";
 import { VendorStallPage } from "./pages/VendorStall";
 import { VendorProducts } from "./pages/VendorProducts";
 import { VendorOrders } from "./pages/VendorOrders";
 import { VendorRevenue } from "./pages/VendorRevenue";
 import { VendorProfile } from "./pages/VendorProfile";
-import "./styles.css";
+import { AboutUs } from "./pages/AboutUs";
+import Trends from "./pages/Trends";
+import { Header } from "./components/Header";
+import { AdminHeader } from "./components/AdminHeader";
+import { VendorHeader } from "./components/VendorHeader";
 
-type Page = 
-  | "home" 
-  | "login" 
-  | "stalls" 
-  | `stall/${string}` 
-  | `product/${string}` 
-  | "cart" 
-  | "preorder" 
-  | "profile" 
-  | "about" 
-  | "trends"
-  | "admin" 
-  | "admin-stalls" 
-  | "admin-vendors" 
-  | "admin-students"
-  | "vendor-stall" 
-  | "vendor-products" 
-  | "vendor-orders" 
-  | "vendor-revenue" 
-  | "vendor-profile";
+type UserRole = "student" | "vendor" | "admin" | null;
 
-export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("home");
-  const [pageParams, setPageParams] = useState<any>(null);
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  profilePictureUrl?: string | null;
+  stallId?: string;
+  stallName?: string;
+}
+
+function App() {
+  const [currentPage, setCurrentPage] = useState("home");
+  const [pageData, setPageData] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [cartCount, setCartCount] = useState(0);
 
+  // Load token and user from localStorage on mount
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
-    const savedUserId = localStorage.getItem("userId");
-    const savedRole = localStorage.getItem("userRole");
-
-    if (savedToken && savedUserId) {
+    const savedUser = localStorage.getItem("user");
+    
+    if (savedToken) {
       setToken(savedToken);
-      setUserId(savedUserId);
-      setUserRole(savedRole);
     }
-
-    updateCartCount();
+    
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+      } catch (e) {
+        console.error("Failed to parse user data:", e);
+      }
+    }
   }, []);
 
-  const updateCartCount = () => {
-    try {
-      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-      const count = cart.reduce((sum: number, item: any) => sum + item.quantity, 0);
-      // Store cart count for header
-      localStorage.setItem("cartCount", String(count));
-    } catch {
-      localStorage.setItem("cartCount", "0");
-    }
-  };
+  // Update cart count
+  useEffect(() => {
+    const updateCartCount = () => {
+      try {
+        const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+        const count = cart.reduce((sum: number, item: any) => sum + (item.isChecked !== false ? item.quantity : 0), 0);
+        setCartCount(count);
+      } catch (e) {
+        setCartCount(0);
+      }
+    };
 
+    updateCartCount();
+    window.addEventListener("storage", updateCartCount);
+    
+    const interval = setInterval(updateCartCount, 2000);
+    
+    return () => {
+      window.removeEventListener("storage", updateCartCount);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Handle login
   const handleLogin = (
     token: string,
     userId: string,
     role: string,
     name?: string,
     profilePictureUrl?: string | null,
-    stallId?: string
+    stallId?: string,
+    stallName?: string
   ) => {
-    setToken(token);
-    setUserId(userId);
-    setUserRole(role);
-
     localStorage.setItem("token", token);
-    localStorage.setItem("userId", userId);
-    localStorage.setItem("userRole", role);
-    if (name) localStorage.setItem("userName", name);
-    if (profilePictureUrl) localStorage.setItem("userProfilePic", profilePictureUrl);
-    if (stallId) localStorage.setItem("userStallId", stallId);
+    setToken(token);
 
-    if (role === "admin") {
-      setCurrentPage("admin");
-    } else if (role === "vendor") {
-      setCurrentPage("vendor-stall");
-    } else {
-      setCurrentPage("home");
-    }
-  };
-
-  const handleLogout = () => {
-    setToken(null);
-    setUserId(null);
-    setUserRole(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userProfilePic");
-    localStorage.removeItem("userStallId");
-    localStorage.removeItem("cartCount");
-    setCurrentPage("home");
-  };
-
-  const navigate = (page: string, params?: any) => {
-    if (page === "login" && token) {
-      if (userRole === "admin") {
-        setCurrentPage("admin");
-      } else if (userRole === "vendor") {
-        setCurrentPage("vendor-stall");
-      } else {
-        setCurrentPage("home");
-      }
-      return;
-    }
-
-    setCurrentPage(page as Page);
-    setPageParams(params || null);
-    
-    if (page === "cart" || page === "preorder") {
-      updateCartCount();
-    }
-  };
-
-  // Helper to ensure token is defined for protected routes
-  const getToken = (): string | undefined => token || undefined;
-  const getUserId = (): string | undefined => userId || undefined;
-
-  const renderPage = () => {
-    const commonProps = {
-      token: getToken(),
-      onNavigate: navigate,
-      onLogout: handleLogout,
+    const userData: User = {
+      id: userId,
+      name: name || "User",
+      email: "",
+      role: role as UserRole,
+      profilePictureUrl: profilePictureUrl || null,
+      stallId: stallId,
+      stallName: stallName,
     };
 
-    // Protected routes that require token
-    if (currentPage === "cart" || currentPage === "preorder" || currentPage === "profile") {
-      if (!token) return <Login onLogin={handleLogin} onNavigate={navigate} />;
-    }
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
 
-    // Admin routes
-    if (["admin", "admin-stalls", "admin-vendors", "admin-students"].includes(currentPage)) {
-      if (!token || userRole !== "admin") return <Login onLogin={handleLogin} onNavigate={navigate} />;
-    }
-
-    // Vendor routes
-    if (["vendor-stall", "vendor-products", "vendor-orders", "vendor-revenue", "vendor-profile"].includes(currentPage)) {
-      if (!token || userRole !== "vendor") return <Login onLogin={handleLogin} onNavigate={navigate} />;
-    }
-
-    switch (currentPage) {
-      case "home":
-        return <LandingPage {...commonProps} />;
-      case "login":
-        return <Login onLogin={handleLogin} onNavigate={navigate} />;
-      case "stalls":
-        return <Stalls {...commonProps} />;
-      case "cart":
-        return <Cart {...commonProps} token={token!} />;
-      case "preorder":
-        return <Preorder {...commonProps} token={token!} preorderData={pageParams} />;
-      case "profile":
-        return <Profile {...commonProps} token={token!} userId={userId!} />;
-      case "about":
-        return <AboutUs {...commonProps} />;
-      case "trends":
-        return <Trends {...commonProps} onBack={() => navigate("home")} />;
-      case "admin":
-        return <AdminDashboard {...commonProps} token={token!} />;
-      case "admin-stalls":
-        return <AdminStalls {...commonProps} token={token!} />;
-      case "admin-vendors":
-        return <AdminVendors {...commonProps} token={token!} />;
-      case "admin-students":
-        return <AdminStudents {...commonProps} token={token!} />;
-      case "vendor-stall":
-        return <VendorStallPage {...commonProps} token={token!} />;
-      case "vendor-products":
-        return <VendorProducts {...commonProps} token={token!} />;
-      case "vendor-orders":
-        return <VendorOrders {...commonProps} token={token!} />;
-      case "vendor-revenue":
-        return <VendorRevenue {...commonProps} token={token!} />;
-      case "vendor-profile":
-        return <VendorProfile {...commonProps} token={token!} userId={userId!} />;
-      default:
-        if (currentPage.startsWith("product/")) {
-          const productId = currentPage.split("/")[1];
-          return <Product {...commonProps} productId={productId} />;
-        }
-        if (currentPage.startsWith("stall/")) {
-          const stallId = currentPage.split("/")[1];
-          return <Stalls {...commonProps} stallId={stallId} />;
-        }
-        return <LandingPage {...commonProps} />;
+    if (role === "admin") {
+      navigateTo("admin");
+    } else if (role === "vendor") {
+      navigateTo("vendor-stall");
+    } else {
+      navigateTo("home");
     }
   };
 
-  return renderPage();
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
+    navigateTo("home");
+  };
+
+  // Navigation function
+  const navigateTo = (page: string, data?: any) => {
+    setCurrentPage(page);
+    setPageData(data || null);
+    window.scrollTo(0, 0);
+  };
+
+  // Get the current user's role
+  const getCurrentRole = (): UserRole => {
+    return user?.role || null;
+  };
+
+  // Render the appropriate header based on role
+  const renderHeader = () => {
+    const role = getCurrentRole();
+    const isAdminPage = currentPage.startsWith("admin");
+    const isVendorPage = currentPage.startsWith("vendor");
+
+    // If it's an admin page or user role is admin, use AdminHeader
+    if (isAdminPage || role === "admin") {
+      return (
+        <AdminHeader
+          onNavigate={navigateTo}
+          token={token}
+          onLogout={handleLogout}
+          currentPage={currentPage}
+        />
+      );
+    }
+
+    // If it's a vendor page or user role is vendor, use VendorHeader
+    if (isVendorPage || role === "vendor") {
+      return (
+        <VendorHeader
+          onNavigate={navigateTo}
+          token={token}
+          stallName={user?.stallName}
+          onLogout={handleLogout}
+          currentPage={currentPage}
+        />
+      );
+    }
+
+    // Default to regular Header for students and guests
+    return (
+      <Header
+        onNavigate={navigateTo}
+        token={token}
+        onLogout={handleLogout}
+        cartCount={cartCount}
+        currentPage={currentPage}
+      />
+    );
+  };
+
+  // Render the appropriate page (WITHOUT headers inside pages)
+  const renderPage = () => {
+    switch (currentPage) {
+      case "home":
+        return <LandingPage onNavigate={navigateTo} token={token} onLogout={handleLogout} />;
+      case "login":
+        return <Login onLogin={handleLogin} onNavigate={navigateTo} />;
+      case "stalls":
+        return <Stalls token={token || undefined} onNavigate={navigateTo} stallId={pageData?.stallId} />;
+      case "product":
+        return <Product token={token || undefined} productId={pageData} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "cart":
+        return <Cart token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "preorder":
+        return <Preorder token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} preorderData={pageData} />;
+      case "profile":
+        return <Profile token={token || ""} userId={user?.id || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "about":
+        return <AboutUs onNavigate={navigateTo} token={token} onLogout={handleLogout} />;
+      case "trends":
+        return <Trends token={token || undefined} onNavigate={navigateTo} onLogout={handleLogout} onBack={() => navigateTo("home")} />;
+      
+      // Admin Pages
+      case "admin":
+        return <AdminDashboard token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "admin-stalls":
+        return <AdminStalls token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "admin-vendors":
+        return <AdminVendors token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "admin-students":
+        return <AdminStudents token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "admin-profile":
+        return <AdminProfile token={token || ""} userId={user?.id || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      
+      // Vendor Pages
+      case "vendor-stall":
+        return <VendorStallPage token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "vendor-products":
+        return <VendorProducts token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "vendor-orders":
+        return <VendorOrders token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "vendor-revenue":
+        return <VendorRevenue token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "vendor-profile":
+        return <VendorProfile token={token || ""} userId={user?.id || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      
+      default:
+        return <LandingPage onNavigate={navigateTo} token={token} onLogout={handleLogout} />;
+    }
+  };
+
+  return (
+    <div className="app">
+      {/* Header rendered here ONCE based on role */}
+      {renderHeader()}
+      <main className="app-main">
+        {renderPage()}
+      </main>
+    </div>
+  );
 }
+
+export default App;

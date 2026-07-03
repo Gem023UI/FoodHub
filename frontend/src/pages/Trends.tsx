@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { ProductCard } from "../components/ProductCard";
@@ -120,7 +119,6 @@ export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsPr
   if (isLoading) {
     return (
       <div className="trends-page">
-        <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="trends" />
         <div className="trends-loading"><Loader /></div>
         <Footer onNavigate={onNavigate} />
       </div>
@@ -129,8 +127,6 @@ export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsPr
 
   return (
     <div className="trends-page">
-      <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="trends" />
-
       <div className="trends-container">
         <div className="trends-header">
           <button className="btn-back" onClick={onBack}>← Back</button>

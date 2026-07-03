@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrderModel = exports.PaymentModel = exports.OrderHistoryModel = exports.OrderLineModel = void 0;
 const mongoose_1 = require("mongoose");
 
-// Order Line Schema - individual items in an order
+// Order Line Schema - individual items in an order with nutrition data
 const orderLineSchema = new mongoose_1.Schema({
   productId: {
     type: mongoose_1.Schema.Types.ObjectId,
@@ -13,7 +13,14 @@ const orderLineSchema = new mongoose_1.Schema({
   productName: { type: String, required: true },
   price: { type: Number, required: true, min: 0 },
   quantity: { type: Number, required: true, min: 1 },
-  subtotal: { type: Number, required: true, min: 0 }
+  subtotal: { type: Number, required: true, min: 0 },
+  // Add nutrition fields from the product
+  nutrition: {
+    calories: { type: Number, default: null },
+    protein: { type: Number, default: null },
+    carbs: { type: Number, default: null },
+    allergen: { type: String, default: "" }
+  }
 });
 
 // Payment Record Schema
@@ -21,7 +28,7 @@ const paymentRecordSchema = new mongoose_1.Schema({
   orderId: {
     type: mongoose_1.Schema.Types.ObjectId,
     ref: "Order",
-    required: false, // Changed from true to false to allow null initially
+    required: false,
     default: null
   },
   totalAmount: { type: Number, required: true, min: 0 },

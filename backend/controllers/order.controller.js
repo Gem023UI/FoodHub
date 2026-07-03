@@ -41,12 +41,21 @@ async function createOrder(data) {
         const subtotal = product.price * item.quantity;
         totalAmount += subtotal;
 
+        // Include nutrition data from the product
+        const nutrition = product.nutrition || {};
+        
         orderLines.push({
             productId: product._id,
             productName: product.productName,
             price: product.price,
             quantity: item.quantity,
-            subtotal
+            subtotal,
+            nutrition: {
+                calories: nutrition.calories || null,
+                protein: nutrition.protein || null,
+                carbs: nutrition.carbs || null,
+                allergen: nutrition.allergen || ""
+            }
         });
 
         product.stocks -= item.quantity;
@@ -56,6 +65,10 @@ async function createOrder(data) {
 
     // Generate a new ObjectId for the order
     const orderId = new mongoose_1.Types.ObjectId();
+
+    // Get the count of existing orders for this student to determine order number
+    const existingOrdersCount = await models_1.OrderModel.countDocuments({ studentId });
+    const orderNumber = existingOrdersCount + 1;
 
     // Create the order with a proper ObjectId for paymentRecord
     const order = await models_1.OrderModel.create({
@@ -67,8 +80,9 @@ async function createOrder(data) {
         totalAmount,
         orderStatus: "pending",
         paymentMethod,
+        orderNumber: orderNumber, // Add this field
         paymentRecord: {
-            orderId: orderId, // Use the same ObjectId
+            orderId: orderId,
             totalAmount,
             paymentMethod,
             paymentReference: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -140,7 +154,7 @@ async function checkBudgetCapAndNotify(studentId, orderTotal) {
 async function getStudentOrders(studentId) {
     return models_1.OrderModel.find({ studentId })
         .populate("stallId", "stallName stallPicture section")
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: 1 }) // Sort ascending (oldest first)
         .lean();
 }
 
@@ -148,7 +162,7 @@ async function getStudentOrders(studentId) {
 async function getStallOrders(stallId) {
     return models_1.OrderModel.find({ stallId })
         .populate("studentId", "firstName lastName email tuptId course section")
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: 1 }) // Sort ascending (oldest first)
         .lean();
 }
 

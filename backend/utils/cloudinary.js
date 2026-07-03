@@ -8,9 +8,10 @@ function initCloudinary() {
   const config = getConfig();
   cloudinary.config({
     cloud_name: config.cloudinaryCloudName,
-    api_key:    config.cloudinaryApiKey,
+    api_key: config.cloudinaryApiKey,
     api_secret: config.cloudinaryApiSecret,
   });
+  console.log("☁️ Cloudinary initialized");
 }
 
 function createVendorUpload() {
@@ -65,6 +66,26 @@ function createVendorProfileUpload() {
   return multer({ storage });
 }
 
-module.exports.createStudentProfileUpload = createStudentProfileUpload;
-module.exports.createVendorProfileUpload = createVendorProfileUpload;
-module.exports = { initCloudinary, createVendorUpload, createProductUpload, createStudentProfileUpload, createVendorProfileUpload };
+// ─── ADMIN PROFILE UPLOAD ──────────────────────────────────────────────
+function createAdminProfileUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/profiles/admins",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 500, height: 500, crop: "fill", gravity: "face" }],
+    },
+  });
+  return multer({ storage });
+}
+
+// Export all functions
+module.exports = { 
+  initCloudinary, 
+  createVendorUpload, 
+  createProductUpload, 
+  createStudentProfileUpload, 
+  createVendorProfileUpload,
+  createAdminProfileUpload
+};

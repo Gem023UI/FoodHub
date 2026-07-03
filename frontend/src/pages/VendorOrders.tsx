@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { VendorHeader } from "../components/VendorHeader";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
+import { getVendorStall, getStallVendors } from "../services/stall.service";
+import { getStallOrders, updateOrderStatus, updatePaymentStatus } from "../services/order.service";
 import "../styles/VendorOrders.css";
 
 interface Order {
@@ -150,7 +151,6 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
   if (isLoading) {
     return (
       <div className="vendor-orders-page">
-        <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
         <div className="vendor-orders-loading">
           <Loader />
         </div>
@@ -161,8 +161,6 @@ export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps)
 
   return (
     <div className="vendor-orders-page">
-      <VendorHeader onNavigate={onNavigate} token={token} onLogout={onLogout} />
-
       <div className="vendor-orders-container">
         <div className="vendor-orders-header">
           <h1>Orders</h1>

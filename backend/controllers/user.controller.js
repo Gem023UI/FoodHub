@@ -104,6 +104,7 @@ async function createAdmin(data) {
         contactNumber: data.contactNumber ?? null,
         email: data.email,
         passwordHash,
+        profilePictureUrl: data.profilePictureUrl ?? null,
         status: data.status ?? "active",
     });
 }
@@ -111,7 +112,8 @@ async function createAdmin(data) {
 async function updateAdmin(adminId, updates) {
     if (!(0, ids_1.isValidObjectId)(adminId)) return null;
 
-    const allowed = ["firstName", "lastName", "contactNumber", "email", "status"];
+    // Updated allowed fields to include firstName, lastName, profilePictureUrl
+    const allowed = ["firstName", "lastName", "contactNumber", "email", "status", "profilePictureUrl"];
     const sanitized = {};
     for (const f of allowed) {
         if (f in updates) sanitized[f] = updates[f];
@@ -126,7 +128,6 @@ async function updateAdmin(adminId, updates) {
 // ── Legacy helpers ───────────────────────────────────────────────────────────
 
 async function listUsers() {
-    // Combine all users
     const students = await models_1.StudentModel.find({})
         .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
         .lean();
@@ -159,7 +160,6 @@ async function getUserById(userId) {
 async function updateUser(userId, updates) {
     if (!(0, ids_1.isValidObjectId)(userId)) return null;
     
-    // Determine user type and update accordingly
     let user = await models_1.StudentModel.findById(userId);
     if (user) {
         return updateStudent(userId, updates, true);
