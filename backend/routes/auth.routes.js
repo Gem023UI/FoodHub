@@ -4,135 +4,136 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.authRouter = void 0;
 
 const express_1 = require("express");
-const auth_1 = require("../middleware/auth");
 const auth_controller_1 = require("../controllers/auth.controller");
 
 const authRouter = (0, express_1.Router)();
 exports.authRouter = authRouter;
 
-// ─── STUDENT REGISTER ────────────────────────────────────────────────────
-authRouter.post("/register/student", async (request, response) => {
-    const {
-        firstName, lastName, birthdate, email,
-        tuptId, course, section, contactNumber, password, profilePictureUrl
-    } = request.body;
-
-    if (!firstName || !lastName || !email || !password || !tuptId || !course || !section) {
-        response.status(400).json({ 
-            message: "All required fields must be provided." 
-        });
-        return;
-    }
-
-    // Validate TUPT-ID format
-    const tuptPattern = /^TUPT-\d{2}-\d{4}$/i;
-    if (!tuptPattern.test(tuptId)) {
-        response.status(400).json({ 
-            message: "TUPT ID must follow the format TUPT-XX-XXXX (e.g. TUPT-21-1234)." 
-        });
-        return;
-    }
-
-    const result = await (0, auth_controller_1.registerStudent)({
-        firstName, lastName, birthdate, email,
-        tuptId, course, section, contactNumber, password, profilePictureUrl
-    });
-
-    if (!result.success) {
-        const messages = {
-            email_exists: "An account with that email already exists.",
-            tupt_id_exists: "A student with that TUPT ID already exists."
-        };
-        response.status(400).json({ 
-            message: messages[result.reason] || "Registration failed." 
-        });
-        return;
-    }
-
-    response.status(201).json({ 
-        message: "Registration successful! Please check your email for the verification code." 
-    });
-});
-
-// ─── LOGIN ──────────────────────────────────────────────────────────────
+// ── LOGIN ──────────────────────────────────────────────────────────────
 authRouter.post("/login", async (request, response) => {
     const { email, password } = request.body;
 
+    console.log(`📝 Login request for: ${email}`);
+
     if (!email || !password) {
-        response.status(400).json({ message: "Email and password are required." });
-        return;
+        console.log("❌ Missing email or password");
+        return response.status(400).json({
+            message: "Email and password are required."
+        });
     }
 
-    const result = await (0, auth_controller_1.loginUser)(email, password);
+    try {
+        const result = await (0, auth_controller_1.login)(email, password);
 
-    if (!result.success) {
-        const messages = {
-            invalid_credentials: "Invalid email or password.",
-            suspended: "Your account has been suspended by an administrator.",
-            unverified: "Please verify your email before logging in. Check your inbox for the verification code.",
-            pending_approval: "Your vendor account is pending admin approval."
-        };
-        response.status(401).json({ message: messages[result.reason] || "Login failed." });
-        return;
+        if (!result.success) {
+            const messages = {
+                invalid_credentials: "Invalid email or password. Please try again.",
+                account_deactivated: "Your account has been deactivated. Please contact support."
+            };
+            console.log(`❌ Login failed: ${result.reason}`);
+            return response.status(401).json({
+                message: messages[result.reason] || "Login failed. Please try again."
+            });
+        }
+
+        console.log(`✅ Login successful for: ${email}`);
+        response.json(result.data);
+    } catch (error) {
+        console.error("❌ Login error:", error);
+        response.status(500).json({ 
+            message: "Login failed. Please try again later.",
+            error: process.env.NODE_ENV === "development" ? error.message : undefined
+        });
     }
-
-    response.json(result.data);
 });
 
-// ─── VERIFY EMAIL ──────────────────────────────────────────────────────
+// ── REGISTER STUDENT ──────────────────────────────────────────────────
+authRouter.post("/register/student", async (request, response) => {
+    console.log("📝 Register student request");
+    
+    try {
+        const result = await (0, auth_controller_1.registerStudent)(request.body);
+
+        if (!result.success) {
+            const messages = {
+                email_exists: "Email already registered.",
+                tupt_id_exists: "TUPT ID already registered."
+            };
+            console.log(`❌ Registration failed: ${result.reason}`);
+            return response.status(400).json({
+                message: messages[result.reason] || "Registration failed."
+            });
+        }
+
+        console.log(`✅ Registration successful for: ${request.body.email}`);
+        response.status(201).json({
+            message: "Registration successful. Please check your email for verification."
+        });
+    } catch (error) {
+        console.error("❌ Registration error:", error);
+        response.status(500).json({ 
+            message: "Registration failed. Please try again later.",
+            error: process.env.NODE_ENV === "development" ? error.message : undefined
+        });
+    }
+});
+
+// ── VERIFY EMAIL ──────────────────────────────────────────────────────
 authRouter.post("/verify-email", async (request, response) => {
     const { email, code } = request.body;
 
     if (!email || !code) {
-        response.status(400).json({ message: "Email and code are required." });
-        return;
+        return response.status(400).json({
+            message: "Email and verification code are required."
+        });
     }
 
-    const result = await (0, auth_controller_1.verifyEmail)(email, code);
+    try {
+        const result = await (0, auth_controller_1.verifyEmail)(email, code);
 
-    if (!result.success) {
-        const messages = {
-            user_not_found: "No account found with that email.",
-            already_verified: "Email is already verified.",
-            invalid_code: "Invalid verification code.",
-            code_expired: "Verification code has expired. Please request a new code."
-        };
-        response.status(400).json({ message: messages[result.reason] || "Verification failed." });
-        return;
+        if (!result.success) {
+            return response.status(400).json({
+                message: result.reason === "invalid_or_expired_code"
+                    ? "Invalid or expired verification code."
+                    : "Verification failed."
+            });
+        }
+
+        response.json({ message: result.message });
+    } catch (error) {
+        console.error("❌ Verification error:", error);
+        response.status(500).json({ message: "Verification failed." });
     }
-
-    response.json({ message: "Email verified successfully! You can now log in." });
 });
 
-// ─── RESEND VERIFICATION ──────────────────────────────────────────────
+// ── RESEND VERIFICATION ──────────────────────────────────────────────
 authRouter.post("/resend-verification", async (request, response) => {
     const { email } = request.body;
 
     if (!email) {
-        response.status(400).json({ message: "Email is required." });
-        return;
-    }
-
-    const result = await (0, auth_controller_1.resendVerification)(email);
-
-    if (!result.success) {
-        const messages = {
-            user_not_found: "No account found with that email.",
-            already_verified: "Email is already verified.",
-            cooldown: "Please wait before requesting a new code."
-        };
-        const status = result.reason === "cooldown" ? 429 : 400;
-        response.status(status).json({ 
-            message: messages[result.reason] || "Failed to resend code.",
-            ...(result.remainingSeconds && { remainingSeconds: result.remainingSeconds })
+        return response.status(400).json({
+            message: "Email is required."
         });
-        return;
     }
 
-    response.json({ message: "New verification code sent to your email." });
-});
+    try {
+        const result = await (0, auth_controller_1.resendVerification)(email);
 
-// ─── GET CURRENT USER ──────────────────────────────────────────────────
-authRouter.get("/me", auth_1.authenticateRequest, (request, response) => {
-    response.json({ userId: request.userId, role: request.role });
+        if (!result.success) {
+            const messages = {
+                student_not_found: "Student not found.",
+                already_verified: "Email already verified.",
+                cooldown: `Please wait ${result.remainingSeconds || 60} seconds before requesting again.`
+            };
+            return response.status(400).json({
+                message: messages[result.reason] || "Failed to resend verification.",
+                remainingSeconds: result.remainingSeconds
+            });
+        }
+
+        response.json({ message: result.message });
+    } catch (error) {
+        console.error("❌ Resend verification error:", error);
+        response.status(500).json({ message: "Failed to resend verification." });
+    }
 });

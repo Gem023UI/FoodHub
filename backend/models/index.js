@@ -26,3 +26,6 @@ Object.defineProperty(exports, "StallModel", { enumerable: true, get: function (
 
 var student_model_1 = require("./student.model");
 Object.defineProperty(exports, "StudentModel", { enumerable: true, get: function () { return student_model_1.StudentModel; } });
+
+var vendor_model_1 = require("./vendor.model");
+Object.defineProperty(exports, "VendorModel", { enumerable: true, get: function () { return vendor_model_1.VendorModel; } });

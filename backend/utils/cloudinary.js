@@ -3,6 +3,7 @@ const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
 const { getConfig } = require("../config/env");
+const streamifier = require("streamifier");
 
 function initCloudinary() {
   const config = getConfig();
@@ -12,6 +13,35 @@ function initCloudinary() {
     api_secret: config.cloudinaryApiSecret,
   });
   console.log("☁️ Cloudinary initialized");
+}
+
+// ── Upload buffer to Cloudinary ─────────────────────────────────────────
+async function uploadToCloudinary(buffer, folder = 'foodhub') {
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder: folder,
+                resource_type: 'image',
+                transformation: [
+                    { quality: 'auto' },
+                    { fetch_format: 'auto' }
+                ]
+            },
+            (error, result) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve({
+                        url: result.secure_url,
+                        publicId: result.public_id
+                    });
+                }
+            }
+        );
+        
+        const readableStream = streamifier.createReadStream(buffer);
+        readableStream.pipe(uploadStream);
+    });
 }
 
 function createVendorUpload() {
@@ -66,7 +96,6 @@ function createVendorProfileUpload() {
   return multer({ storage });
 }
 
-// ─── ADMIN PROFILE UPLOAD ──────────────────────────────────────────────
 function createAdminProfileUpload() {
   initCloudinary();
   const storage = new CloudinaryStorage({
@@ -80,9 +109,9 @@ function createAdminProfileUpload() {
   return multer({ storage });
 }
 
-// Export all functions
 module.exports = { 
   initCloudinary, 
+  uploadToCloudinary,
   createVendorUpload, 
   createProductUpload, 
   createStudentProfileUpload, 

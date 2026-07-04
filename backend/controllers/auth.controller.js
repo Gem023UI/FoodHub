@@ -1,231 +1,251 @@
 "use strict";
 
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.login = login;
 exports.registerStudent = registerStudent;
-exports.loginUser = loginUser;
 exports.verifyEmail = verifyEmail;
 exports.resendVerification = resendVerification;
-exports.isDuplicateEmailError = isDuplicateEmailError;
 
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const mongo_1 = require("../utils/mongo");
 const models_1 = require("../models");
+const bcryptjs_1 = require("bcryptjs");
 const jwt_1 = require("../utils/jwt");
-const env_1 = require("../config/env");
 const mailer_1 = require("../utils/mailer");
+const ids_1 = require("../utils/ids");
 
-// ── STUDENT REGISTRATION ──────────────────────────────────────────────────
-async function registerStudent(data) {
-    let existing = await models_1.StudentModel.findOne({ email: data.email.toLowerCase().trim() });
-    if (!existing) existing = await models_1.AdminModel.findOne({ email: data.email.toLowerCase().trim() });
-    if (existing) return { success: false, reason: "email_exists" };
+// ── LOGIN ──────────────────────────────────────────────────────────────
+async function login(email, password) {
+    console.log(`🔐 Login attempt for: ${email}`);
+    
+    let user = null;
+    let role = "student";
+    let stallId = null;
+    let stallName = null;
+    let position = null;
+    let userModel = null;
 
-    const existingStudent = await models_1.StudentModel.findOne({
-        tuptId: data.tuptId.toUpperCase().trim()
-    });
-    if (existingStudent) return { success: false, reason: "tupt_id_exists" };
-
-    const passwordHash = await bcryptjs_1.default.hash(data.password, 10);
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-
-    const student = await models_1.StudentModel.create({
-        firstName: data.firstName.trim(),
-        lastName: data.lastName.trim(),
-        email: data.email.toLowerCase().trim(),
-        passwordHash,
-        role: "student",
-        status: "unverified",
-        birthdate: data.birthdate || null,
-        tuptId: data.tuptId.toUpperCase().trim(),
-        course: data.course.trim(),
-        section: data.section.trim(),
-        contactNumber: data.contactNumber || null,
-        profilePictureUrl: data.profilePictureUrl || null,
-        emailVerificationCode: verificationCode,
-        emailVerificationExpires: expiresAt,
-        lastVerificationSentAt: new Date(),
-        favorites: [],
-        budgetCap: []
-    });
-
-    try {
-        await (0, mailer_1.sendVerificationEmail)(data.email, verificationCode);
-    } catch (error) {
-        console.error("Failed to send verification email:", error);
+    // ── 1. Check Student Model ──────────────────────────────────────────
+    let student = await models_1.StudentModel.findOne({ email })
+        .select("+passwordHash")
+        .lean();
+    
+    if (student) {
+        console.log(`✅ Found student: ${email}`);
+        user = student;
+        role = "student";
+        userModel = "Student";
     }
 
-    return {
-        success: true,
-        data: { id: student._id.toString(), email: student.email, role: student.role }
-    };
-}
-
-// ── LOGIN ──────────────────────────────────────────────────────────────────
-async function loginUser(email, password) {
-    const config = (0, env_1.getConfig)();
-
-    // Check all user types
-    let user = await models_1.StudentModel.findOne({ email: email.toLowerCase().trim() })
-        .select("+passwordHash +emailVerificationCode +emailVerificationExpires");
-    let userType = "student";
-
-   if (!user) {
-        user = await models_1.AdminModel.findOne({ email: email.toLowerCase().trim() }).select("+passwordHash");
-        userType = "admin";
-    }
-
-    // If this account's email is also listed as a vendor on a stall, treat the login as a vendor login
-    if (user && userType === "student") {
-        const stall = await models_1.StallModel.findOne({ "vendors.email": email.toLowerCase().trim() });
-        if (stall) {
-            const vendorSub = stall.vendors.find(v => v.email === email.toLowerCase().trim());
-            if (vendorSub) {
-                userType = "vendor";
+    // ── 2. Check Vendor Model ──────────────────────────────────────────
+    if (!user) {
+        const vendor = await models_1.VendorModel.findOne({ email })
+            .select("+passwordHash")
+            .lean();
+        
+        if (vendor) {
+            console.log(`✅ Found vendor: ${email}`);
+            role = "vendor";
+            stallId = vendor.stallId || null;
+            position = vendor.position || null;
+            user = {
+                _id: vendor._id,
+                firstName: vendor.firstName,
+                lastName: vendor.lastName,
+                email: vendor.email,
+                passwordHash: vendor.passwordHash,
+                profilePictureUrl: vendor.profilePictureUrl || null,
+                status: vendor.status || "verified",
+                role: "vendor",
+            };
+            userModel = "Vendor";
+            
+            if (stallId) {
+                const stall = await models_1.StallModel.findById(stallId).select("stallName").lean();
+                if (stall) {
+                    stallName = stall.stallName;
+                }
             }
         }
     }
 
-    if (!user) return { success: false, reason: "invalid_credentials" };
-
-    // Check password
-    const passwordMatches = await bcryptjs_1.default.compare(password, user.passwordHash);
-    if (!passwordMatches) return { success: false, reason: "invalid_credentials" };
-
-    // Check if user is verified (except admin)
-    if (userType !== "admin" && user.status !== "verified") {
-        if (user.status === "unverified") return { success: false, reason: "unverified" };
-        if (user.status === "deactivated") return { success: false, reason: "suspended" };
-    }
-
-    // Check admin status - only allow "verified"
-    if (userType === "admin" && user.status !== "verified") {
-        return { success: false, reason: "suspended" };
-    }
-
-    // Get vendor info if applicable
-    let vendorInfo = null;
-    if (userType === "vendor") {
-        const stall = await models_1.StallModel.findOne({ "vendors.email": user.email });
-        if (stall) {
-            const vendorSub = stall.vendors.find(v => v.email === user.email);
-            if (vendorSub) {
-                vendorInfo = {
-                    stallId: stall._id,
-                    stallName: stall.stallName,
-                    position: vendorSub.position,
-                    status: vendorSub.status
-                };
-            }
+    // ── 3. Check Admin Model ──────────────────────────────────────────
+    if (!user) {
+        const admin = await models_1.AdminModel.findOne({ email })
+            .select("+passwordHash")
+            .lean();
+        
+        if (admin) {
+            console.log(`✅ Found admin: ${email}`);
+            role = "admin";
+            user = {
+                _id: admin._id,
+                firstName: admin.firstName,
+                lastName: admin.lastName,
+                email: admin.email,
+                passwordHash: admin.passwordHash,
+                profilePictureUrl: admin.profilePictureUrl || null,
+                status: admin.status || "verified",
+                role: "admin",
+            };
+            userModel = "Admin";
         }
     }
 
-    const accessToken = (0, jwt_1.signAccessToken)({
-        userId: user._id.toString(),
-        role: userType
-    }, config.jwtSecret);
+    // ── 4. User not found ──────────────────────────────────────────────
+    if (!user) {
+        console.log(`❌ User not found: ${email}`);
+        return { success: false, reason: "invalid_credentials" };
+    }
 
-    const userData = {
-        id: user._id.toString(),
-        name: `${user.firstName} ${user.lastName}`,
+    // ── 5. Check if user is deactivated ────────────────────────────────
+    if (user.status === "deactivated" || user.status === "suspended") {
+        console.log(`❌ Account deactivated: ${email}`);
+        return { success: false, reason: "account_deactivated" };
+    }
+
+    // ── 6. Verify password ──────────────────────────────────────────────
+    console.log(`🔑 Verifying password for: ${email}`);
+    const isPasswordValid = await bcryptjs_1.compare(password, user.passwordHash);
+    
+    if (!isPasswordValid) {
+        console.log(`❌ Invalid password for: ${email}`);
+        return { success: false, reason: "invalid_credentials" };
+    }
+
+    console.log(`✅ Password verified for: ${email}`);
+
+    // ── 7. Update last login for vendors ──────────────────────────────
+    if (role === "vendor" && userModel === "Vendor") {
+        await models_1.VendorModel.findByIdAndUpdate(user._id, {
+            lastLogin: new Date()
+        });
+    }
+
+    // ── 8. Generate JWT token ──────────────────────────────────────────
+    const tokenPayload = {
+        userId: user._id,
+        role: role,
         email: user.email,
-        role: userType,
-        profilePictureUrl: user.profilePictureUrl || null,
-        isActive: user.status === "verified",
-        status: user.status
     };
+    
+    console.log(`🔑 Generating token for: ${email} with role: ${role}`);
+    const token = (0, jwt_1.generateAccessToken)(tokenPayload);
 
-    if (userType === "vendor" && vendorInfo) {
-        userData.stallId = vendorInfo.stallId;
-        userData.stallName = vendorInfo.stallName;
-        userData.position = vendorInfo.position;
-    }
+    console.log(`✅ Login successful for: ${email} (${role})`);
 
     return {
         success: true,
         data: {
-            accessToken,
-            user: userData
+            accessToken: token,
+            user: {
+                id: user._id,
+                name: `${user.firstName} ${user.lastName}`,
+                email: user.email,
+                role: role,
+                profilePictureUrl: user.profilePictureUrl || null,
+                isActive: user.status !== "deactivated" && user.status !== "suspended",
+                status: user.status || "verified",
+                stallId: stallId || undefined,
+                stallName: stallName || undefined,
+                position: position || undefined,
+            }
         }
     };
 }
 
-// ── VERIFY EMAIL ──────────────────────────────────────────────────────────
-async function verifyEmail(email, code) {
-    const trimmedCode = code.trim();
-
-    let user = await models_1.StudentModel.findOne({ email: email.toLowerCase().trim() })
-        .select("+emailVerificationCode +emailVerificationExpires");
-
-    if (!user) return { success: false, reason: "user_not_found" };
-
-    if (user.status === "verified") {
-        return { success: false, reason: "already_verified" };
-    }
-
-    if (String(user.emailVerificationCode).trim() !== String(trimmedCode).trim()) {
-        return { success: false, reason: "invalid_code" };
-    }
-    if (user.emailVerificationExpires < new Date()) {
-        return { success: false, reason: "code_expired" };
-    }
-
-    await models_1.StudentModel.findByIdAndUpdate(user._id, {
-        $set: {
-            status: "verified",
-            emailVerificationCode: null,
-            emailVerificationExpires: null,
-            lastVerificationSentAt: null,
-        },
+// ── REGISTER STUDENT ──────────────────────────────────────────────────
+async function registerStudent(data) {
+    const existing = await models_1.StudentModel.findOne({
+        $or: [{ email: data.email }, { tuptId: data.tuptId }]
     });
 
-    return { success: true };
-}
-
-// ── RESEND VERIFICATION ──────────────────────────────────────────────────
-async function resendVerification(email) {
-    let user = await models_1.StudentModel.findOne({ email: email.toLowerCase().trim() })
-        .select("+emailVerificationCode +emailVerificationExpires +lastVerificationSentAt");
-
-    if (!user) return { success: false, reason: "user_not_found" };
-
-    if (user.status === "verified") {
-        return { success: false, reason: "already_verified" };
-    }
-
-    const lastSentAt = user.lastVerificationSentAt || new Date(0);
-    const timeSinceLastSent = Date.now() - new Date(lastSentAt).getTime();
-    const oneMinute = 60 * 1000;
-
-    if (timeSinceLastSent < oneMinute) {
-        const remainingSeconds = Math.ceil((oneMinute - timeSinceLastSent) / 1000);
-        return { success: false, reason: "cooldown", remainingSeconds };
-    }
-
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-
-    await models_1.StudentModel.findByIdAndUpdate(user._id, {
-        $set: {
-            emailVerificationCode: verificationCode,
-            emailVerificationExpires: expiresAt,
-            lastVerificationSentAt: new Date(),
+    if (existing) {
+        if (existing.email === data.email) {
+            return { success: false, reason: "email_exists" };
         }
-    });
-
-    try {
-        await (0, mailer_1.sendVerificationEmail)(email, verificationCode);
-    } catch (error) {
-        console.error("Failed to send verification email:", error);
+        if (existing.tuptId === data.tuptId) {
+            return { success: false, reason: "tupt_id_exists" };
+        }
     }
 
-    return { success: true };
+    const salt = await bcryptjs_1.hash(data.password, 10);
+    const verificationCode = (0, ids_1.generateVerificationCode)();
+    const expiresIn = new Date(Date.now() + 10 * 60 * 1000);
+
+    const student = await models_1.StudentModel.create({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        passwordHash: salt,
+        tuptId: data.tuptId,
+        course: data.course,
+        section: data.section,
+        contactNumber: data.contactNumber,
+        birthdate: data.birthdate || null,
+        status: "unverified",
+        emailVerificationCode: verificationCode,
+        emailVerificationExpires: expiresIn,
+        lastVerificationSentAt: new Date(),
+        role: "student",
+    });
+
+    await (0, mailer_1.sendVerificationEmail)(data.email, verificationCode);
+
+    return { success: true, data: { student } };
 }
 
-function isDuplicateEmailError(error) {
-    return (0, mongo_1.isMongoServerError)(error) && error.code === 11000;
+// ── VERIFY EMAIL ──────────────────────────────────────────────────────
+async function verifyEmail(email, code) {
+    const student = await models_1.StudentModel.findOne({
+        email,
+        emailVerificationCode: code,
+        emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!student) {
+        return { success: false, reason: "invalid_or_expired_code" };
+    }
+
+    student.status = "verified";
+    student.emailVerificationCode = null;
+    student.emailVerificationExpires = null;
+    await student.save();
+
+    return { success: true, message: "Email verified successfully" };
+}
+
+// ── RESEND VERIFICATION ──────────────────────────────────────────────
+async function resendVerification(email) {
+    const student = await models_1.StudentModel.findOne({ email });
+    if (!student) {
+        return { success: false, reason: "student_not_found" };
+    }
+
+    if (student.status === "verified") {
+        return { success: false, reason: "already_verified" };
+    }
+
+    const cooldown = 60;
+    const lastSent = student.lastVerificationSentAt;
+    if (lastSent) {
+        const secondsSinceLastSent = (Date.now() - lastSent.getTime()) / 1000;
+        if (secondsSinceLastSent < cooldown) {
+            return {
+                success: false,
+                reason: "cooldown",
+                remainingSeconds: Math.ceil(cooldown - secondsSinceLastSent)
+            };
+        }
+    }
+
+    const code = (0, ids_1.generateVerificationCode)();
+    const expiresIn = new Date(Date.now() + 10 * 60 * 1000);
+
+    student.emailVerificationCode = code;
+    student.emailVerificationExpires = expiresIn;
+    student.lastVerificationSentAt = new Date();
+    await student.save();
+
+    await (0, mailer_1.sendVerificationEmail)(email, code);
+
+    return { success: true, message: "Verification code sent" };
 }

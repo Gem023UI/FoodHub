@@ -495,3 +495,471 @@
     flex-wrap: wrap;
   }
 }
+
+/* ── FORM SECTION TITLE ───────────────────────────────────────────────── */
+.form-section-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #1a1a1a;
+  margin: 20px 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ── IMAGE UPLOAD ─────────────────────────────────────────────────────── */
+.image-upload-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.image-upload-container.small {
+  gap: 8px;
+}
+
+.image-upload-input {
+  display: none;
+}
+
+.image-upload-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f5f5f5;
+  border: 2px dashed #d0d0d0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+}
+
+.image-upload-label:hover {
+  border-color: #ff3131;
+  background: #fff5f5;
+  color: #ff3131;
+}
+
+.image-upload-label.small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.image-upload-label i {
+  font-size: 18px;
+}
+
+.image-upload-label.small i {
+  font-size: 14px;
+}
+
+.image-preview {
+  position: relative;
+  display: inline-block;
+}
+
+.image-preview img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #e8e8e4;
+}
+
+.image-preview.small img {
+  width: 50px;
+  height: 50px;
+}
+
+.image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  background: #ff3131;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.image-remove:hover {
+  background: #cc0000;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* ── ADD VENDOR BUTTON ────────────────────────────────────────────────── */
+.add-vendor-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #ff3131;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-vendor-btn:hover {
+  background: #cc0000;
+  transform: translateY(-1px);
+}
+
+/* ── VENDOR LIST ───────────────────────────────────────────────────────── */
+.vendor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 16px 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.vendor-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.vendor-list::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.vendor-list::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.vendor-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #fafaf8;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.vendor-item-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vendor-name {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.vendor-email {
+  color: #666;
+  font-size: 13px;
+}
+
+.vendor-position {
+  padding: 2px 10px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vendor-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── VENDOR FORM ───────────────────────────────────────────────────────── */
+.vendor-form-container {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 12px 0;
+  border: 2px solid #e8e8e4;
+}
+
+.vendor-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.vendor-form-header h4 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.vendor-form-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+
+.vendor-form-close:hover {
+  color: #333;
+}
+
+.vendor-form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e8e8e4;
+}
+
+.vendor-form-actions .btn-secondary {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.vendor-form-actions .btn-primary {
+  padding: 8px 20px;
+  font-size: 13px;
+}
+
+/* ── MODAL OVERRIDES ──────────────────────────────────────────────────── */
+.modal-content.large {
+  max-width: 800px;
+}
+
+@media (max-width: 768px) {
+  .modal-content.large {
+    max-width: 100%;
+    margin: 10px;
+    padding: 16px;
+  }
+  
+  .vendor-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .vendor-item-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .vendor-item-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .image-upload-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .image-preview img {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .form-section-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* ─── CHARTS SECTION ─────────────────────────────────────────────────── */
+.stalls-charts-section {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 32px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.section-header h2 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.charts-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.chart-container {
+  background: #fafaf8;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #f0f0f0;
+}
+
+.chart-container h3 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.chart-total {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin-top: 12px;
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* ─── TABLE SECTION ──────────────────────────────────────────────────── */
+.table-section {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.table-section h2 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #1a1a1a;
+  margin: 0 0 16px 0;
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────────────────────── */
+@media (max-width: 992px) {
+  .charts-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .stalls-charts-section {
+    padding: 16px;
+  }
+  
+  .chart-container {
+    padding: 12px;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ─── PASSWORD INPUT ─────────────────────────────────────────────────── */
+.password-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.password-input {
+  width: 100%;
+  padding: 10px 14px;
+  padding-right: 45px;
+  border: 1.5px solid #e8e8e4;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.15s;
+  background: #fafaf8;
+  font-family: 'Poppins', sans-serif;
+}
+
+.password-input:focus {
+  border-color: #ff3131;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 49, 49, 0.1);
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 16px;
+  transition: color 0.2s;
+}
+
+.password-toggle-btn:hover {
+  color: #333;
+}
+
+/* ─── VENDOR STATUS BADGE ───────────────────────────────────────────── */
+.vendor-status-badge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.vendor-status-badge.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.vendor-status-badge.pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.vendor-status-badge.deactivated {
+  background: #f8d7da;
+  color: #721c24;
+}

@@ -21,7 +21,7 @@ stallsRouter.get("/test", (req, res) => {
 });
 
 // ── GET ALL STALLS ──────────────────────────────────────────────────────
-// FIX: Changed from listStalls to getStalls
+// Remove auth_1.authenticateRequest from this route
 stallsRouter.get("/", async (request, response) => {
     try {
         console.log("📝 GET /stalls");
