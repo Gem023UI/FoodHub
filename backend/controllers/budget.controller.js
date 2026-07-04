@@ -6,7 +6,12 @@ exports.getBudgetByStatus = getBudgetByStatus;
 exports.getStudentBudget = getStudentBudget;
 exports.createBudget = createBudget;
 exports.updateBudget = updateBudget;
+exports.hasActiveBudgetCap = hasActiveBudgetCap;
+exports.createStudentBudgetCap = createStudentBudgetCap;
+exports.deleteBudgetCap = deleteBudgetCap;
+exports.getStudentBudgetCapsRecords = getStudentBudgetCapsRecords;
 
+const mongoose_1 = require("mongoose");
 const models_1 = require("../models");
 const ids_1 = require("../utils/ids");
 
@@ -90,6 +95,149 @@ async function getStudentBudget(studentId) {
         },
         budgets: budgetsWithSpending
     };
+}
+
+// ── CHECK ACTIVE BUDGET CAP (time-based only) ───────────────────────────
+async function hasActiveBudgetCap(studentId) {
+    const student = await models_1.StudentModel.findById(studentId).select("budgetCap").lean();
+    if (!student) return null;
+    const now = new Date();
+    return student.budgetCap.find(b =>
+        b.status === "active" &&
+        new Date(b.startDate) <= now &&
+        new Date(b.endDate) >= now
+    ) || null;
+}
+
+// ── CREATE STUDENT BUDGET CAP (linked id, blocks overlap) ───────────────
+async function createStudentBudgetCap(studentId, data) {
+    const { amount, period, startDate, endDate } = data;
+
+    const activeCap = await hasActiveBudgetCap(studentId);
+    if (activeCap) {
+        return { success: false, reason: "active_cap_exists", data: { activeCap } };
+    }
+
+    const student = await models_1.StudentModel.findById(studentId);
+    if (!student) {
+        return { success: false, reason: "student_not_found" };
+    }
+
+    const linkId = new mongoose_1.Types.ObjectId();
+
+    student.budgetCap.push({
+        _id: linkId,
+        amount,
+        currentBudget: amount,
+        surplus: 0,
+        period: period || "custom",
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        status: "active"
+    });
+    await student.save();
+
+    const budget = await models_1.BudgetModel.create({
+        _id: linkId,
+        studentId,
+        studentTuptId: student.tuptId,
+        studentCourse: student.course,
+        amount,
+        currentBudget: amount,
+        surplus: 0,
+        duration: { startDate: new Date(startDate), endDate: new Date(endDate) },
+        status: "active"
+    });
+
+    return { success: true, data: { budgetCap: student.budgetCap.id(linkId), budget } };
+}
+
+// ── GET + LAZILY EXPIRE STUDENT BUDGET CAPS ─────────────────────────────
+async function getStudentBudgetCapsRecords(studentId) {
+    const student = await models_1.StudentModel.findById(studentId);
+    if (!student) return null;
+
+    const now = new Date();
+    let hasChanges = false;
+    const budgetUpdates = [];
+
+    for (const cap of student.budgetCap) {
+        // Backfill legacy caps created before currentBudget/surplus existed
+        if (cap.currentBudget === undefined || cap.currentBudget === null) {
+            cap.currentBudget = cap.amount ?? 0;
+            hasChanges = true;
+        }
+        if (cap.surplus === undefined || cap.surplus === null) {
+            cap.surplus = 0;
+            hasChanges = true;
+        }
+
+        if (cap.status === "active" && new Date(cap.endDate) < now) {
+            const newStatus = cap.currentBudget >= 0 ? "accomplished" : "failed";
+            cap.surplus = cap.currentBudget;
+            cap.status = newStatus;
+            hasChanges = true;
+        }
+
+        budgetUpdates.push({
+            capId: cap._id,
+            status: cap.status,
+            currentBudget: cap.currentBudget,
+            surplus: cap.surplus
+        });
+    }
+
+    if (hasChanges) {
+        await student.save();
+        await Promise.all(budgetUpdates.map(u =>
+            models_1.BudgetModel.updateOne(
+                { _id: u.capId },
+                { $set: { status: u.status, currentBudget: u.currentBudget, surplus: u.surplus } }
+            )
+        ));
+    }
+
+    return student.budgetCap;
+}
+
+// ── DELETE BUDGET CAP (both student array + Budget collection) ─────────
+async function deleteBudgetCap(studentId, capId) {
+    if (!(0, ids_1.isValidObjectId)(capId)) {
+        return { success: false, reason: "invalid_cap_id" };
+    }
+
+    const student = await models_1.StudentModel.findById(studentId);
+    if (!student) {
+        return { success: false, reason: "student_not_found" };
+    }
+
+    const cap = student.budgetCap.id(capId);
+    if (!cap) {
+        return { success: false, reason: "cap_not_found" };
+    }
+
+    // Snapshot in case the Budget doc's _id doesn't match (legacy records)
+    const snapshot = { amount: cap.amount, startDate: cap.startDate, endDate: cap.endDate };
+
+    cap.deleteOne();
+    await student.save();
+
+    let deleted = await models_1.BudgetModel.deleteOne({ _id: capId, studentId: student._id });
+
+    if (deleted.deletedCount === 0) {
+        deleted = await models_1.BudgetModel.deleteOne({
+            studentId: student._id,
+            amount: snapshot.amount,
+            "duration.startDate": snapshot.startDate,
+            "duration.endDate": snapshot.endDate
+        });
+    }
+
+    if (deleted.deletedCount === 0) {
+        console.warn(`No matching Budget document found for deleted cap ${capId} (student ${studentId}).`);
+    }
+
+    return { success: true, budgetDeleted: deleted.deletedCount > 0 };
 }
 
 // ── CREATE BUDGET ──────────────────────────────────────────────────────────

@@ -4,28 +4,12 @@ exports.BudgetModel = void 0;
 const mongoose_1 = require("mongoose");
 
 const budgetSchema = new mongoose_1.Schema({
-  studentId: {
-    type: mongoose_1.Schema.Types.ObjectId,
-    ref: "Student",
-    required: true,
-    index: true
-  },
-  studentTuptId: {
-    type: String,
-    required: true,
-    trim: true,
-    uppercase: true
-  },
-  studentCourse: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
+  studentId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Student", required: true, index: true },
+  studentTuptId: { type: String, required: true, trim: true, uppercase: true },
+  studentCourse: { type: String, required: true, trim: true },
+  amount: { type: Number, required: true, min: 0 },
+  currentBudget: { type: Number, required: true, default: 0 },
+  surplus: { type: Number, default: 0 },
   duration: {
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true }

@@ -29,46 +29,12 @@ budgetRouter.get("/", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("ad
 // ── GET STUDENT BUDGET CAPS ──────────────────────────────────────────────
 budgetRouter.get("/student/caps", auth_1.authenticateRequest, async (request, response) => {
     const studentId = request.userId;
-    
     try {
-        const student = await models_1.StudentModel.findById(studentId)
-            .select("budgetCap")
-            .lean();
-        
-        if (!student) {
+        const caps = await (0, budget_controller_1.getStudentBudgetCapsRecords)(studentId);
+        if (!caps) {
             return response.status(404).json({ message: "Student not found." });
         }
-        
-        // Calculate spending for each budget cap
-        const now = new Date();
-        const budgetCapsWithSpending = await Promise.all((student.budgetCap || []).map(async (budget) => {
-            let sinceDate = budget.startDate;
-            if (budget.period === "daily") {
-                sinceDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            } else if (budget.period === "weekly") {
-                sinceDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            } else if (budget.period === "monthly") {
-                sinceDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            }
-            
-            const orders = await models_1.OrderModel.find({
-                studentId,
-                createdAt: { $gte: sinceDate },
-                orderStatus: { $ne: "cancelled" }
-            }).select("totalAmount");
-            
-            const spent = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-            const remaining = Math.max(0, budget.amount - spent);
-            
-            return {
-                ...budget,
-                spent,
-                remaining,
-                percentageUsed: budget.amount > 0 ? Math.min(100, (spent / budget.amount) * 100) : 0
-            };
-        }));
-        
-        response.json({ budgets: budgetCapsWithSpending });
+        response.json({ budgets: caps });
     } catch (error) {
         console.error("Error fetching student budget caps:", error);
         response.status(500).json({ message: "Failed to fetch budget caps." });
@@ -79,47 +45,54 @@ budgetRouter.get("/student/caps", auth_1.authenticateRequest, async (request, re
 budgetRouter.post("/student/cap", auth_1.authenticateRequest, async (request, response) => {
     const studentId = request.userId;
     const { amount, period, startDate, endDate } = request.body;
-    
+
     if (!amount || !startDate || !endDate) {
-        return response.status(400).json({ 
-            message: "Amount, start date, and end date are required." 
+        return response.status(400).json({
+            message: "Amount, start date, and end date are required."
         });
     }
-    
+
     try {
-        const student = await models_1.StudentModel.findById(studentId);
-        if (!student) {
-            return response.status(404).json({ message: "Student not found." });
+        const result = await (0, budget_controller_1.createStudentBudgetCap)(studentId, {
+            amount, period: period || "custom", startDate, endDate
+        });
+
+        if (!result.success) {
+            if (result.reason === "active_cap_exists") {
+                return response.status(409).json({
+                    message: "A budget cap already exists for this time period. Please wait for it to end before adding a new one.",
+                    activeCap: result.data.activeCap
+                });
+            }
+            return response.status(400).json({ message: "Failed to create budget cap." });
         }
-        
-        // Add budget cap to student
-        student.budgetCap.push({
-            amount,
-            period: period || "custom",
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: "active"
-        });
-        
-        await student.save();
-        
-        // Also create in Budget collection
-        const budget = await models_1.BudgetModel.create({
-            studentId,
-            studentTuptId: student.tuptId,
-            studentCourse: student.course,
-            amount,
-            duration: {
-                startDate: new Date(startDate),
-                endDate: new Date(endDate)
-            },
-            status: "active"
-        });
-        
-        response.status(201).json({ budget });
+
+        response.status(201).json({ budgetCap: result.data.budgetCap });
     } catch (error) {
         console.error("Error creating budget cap:", error);
         response.status(500).json({ message: "Failed to create budget cap." });
+    }
+});
+
+// ── DELETE STUDENT BUDGET CAP ────────────────────────────────────────────
+budgetRouter.delete("/student/cap/:capId", auth_1.authenticateRequest, async (request, response) => {
+    const studentId = request.userId;
+    const capId = firstParam(request.params.capId);
+
+    try {
+        const result = await (0, budget_controller_1.deleteBudgetCap)(studentId, capId);
+        if (!result.success) {
+            const messages = {
+                invalid_cap_id: "Invalid budget cap ID.",
+                student_not_found: "Student not found.",
+                cap_not_found: "Budget cap not found."
+            };
+            return response.status(400).json({ message: messages[result.reason] || "Failed to delete budget cap." });
+        }
+        response.json({ success: true });
+    } catch (error) {
+        console.error("Error deleting budget cap:", error);
+        response.status(500).json({ message: "Failed to delete budget cap." });
     }
 });
 

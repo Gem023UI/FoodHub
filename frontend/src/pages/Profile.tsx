@@ -7,11 +7,13 @@ import { getMe, updateMyProfile, uploadStudentPicture } from "../services/user.s
 import { getFavorites } from "../services/favorite.service";
 import { getStudentOrders, getStudentOrdersWithDateRange, type Order } from "../services/order.service";
 import { getProductDetails, type Product } from "../services/product.service";
-import { 
-  getStudentBudgetCaps, 
-  createBudgetCap, 
+import {
+  getStudentBudgetCaps,
+  createBudgetCap,
+  deleteBudgetCap,
+  ActiveBudgetCapError,
   getSpendingAnalytics,
-  type StudentBudgetCap 
+  type StudentBudgetCap
 } from "../services/budget.service";
 import { getNutritionAnalytics, type NutritionAnalytics } from "../services/report.service";
 import "../styles/Profile.css";
@@ -118,17 +120,15 @@ function LineChart({ labels, series, height = 220 }: { labels: string[]; series:
 
 // ── Range/period dropdown ──
 function RangeDropdown({
-  value,
-  onChange,
-  customStart,
-  customEnd,
-  onCustomChange,
+  value, onChange, customStart, customEnd, onCustomChange,
+  options = ["weekly", "monthly", "custom"],
 }: {
   value: ViewRange;
   onChange: (v: ViewRange) => void;
   customStart: string;
   customEnd: string;
   onCustomChange: (start: string, end: string) => void;
+  options?: ViewRange[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -138,7 +138,7 @@ function RangeDropdown({
       </button>
       {open && (
         <div className="range-dropdown-menu">
-          {(["weekly", "monthly", "custom"] as ViewRange[]).map(opt => (
+          {options.map(opt => (
             <button
               key={opt}
               type="button"
@@ -151,7 +151,7 @@ function RangeDropdown({
               {opt}
             </button>
           ))}
-          {value === "custom" && (
+          {value === "custom" && options.includes("custom") && (
             <div className="range-dropdown-custom">
               <input type="date" value={customStart} onChange={(e) => onCustomChange(e.target.value, customEnd)} />
               <span>to</span>
@@ -202,6 +202,10 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   const [newBudgetEnd, setNewBudgetEnd] = useState(isoDate(new Date()));
   const [isSavingBudget, setIsSavingBudget] = useState(false);
   const [spendingData, setSpendingData] = useState<any>(null);
+  const [showBudgetRecords, setShowBudgetRecords] = useState(false);
+  const [capPendingDelete, setCapPendingDelete] = useState<StudentBudgetCap | null>(null);
+  const [isDeletingCap, setIsDeletingCap] = useState(false);
+  const [budgetCapConflict, setBudgetCapConflict] = useState<StudentBudgetCap | null>(null);
   const [budgetChartData, setBudgetChartData] = useState<{ labels: string[]; values: number[] }>({
     labels: [],
     values: []
@@ -252,6 +256,15 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     }
   }, [orderRangeStart, orderRangeEnd]);
 
+  async function loadBudgetCaps() {
+    try {
+      const caps = await getStudentBudgetCaps(token);
+      setBudgetCaps(caps);
+    } catch (err) {
+      console.error("Error loading budget caps:", err);
+    }
+  }
+
   async function loadProfile() {
     setIsLoading(true);
     setError(null);
@@ -262,9 +275,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
       setEditContact(me.contactNumber || "");
       
       // Load budget caps from student data
-      if (me.budgetCap) {
-        setBudgetCaps(me.budgetCap);
-      }
+      await loadBudgetCaps();
 
       // Load favorites
       try {
@@ -319,50 +330,16 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
 
   async function loadBudgetAnalytics() {
     try {
-      let startDate = budgetCustomStart;
-      let endDate = budgetCustomEnd;
-      
-      if (budgetView === "weekly") {
-        const end = new Date();
-        const start = new Date(end);
-        start.setDate(start.getDate() - 7);
-        startDate = isoDate(start);
-        endDate = isoDate(end);
-      } else if (budgetView === "monthly") {
-        const end = new Date();
-        const start = new Date(end);
-        start.setMonth(start.getMonth() - 1);
-        startDate = isoDate(start);
-        endDate = isoDate(end);
-      }
-      
-      const spending = await getSpendingAnalytics(
-        token,
-        budgetView === "custom" ? "custom" : budgetView,
-        startDate,
-        endDate
-      );
+      const spending = await getSpendingAnalytics(token, budgetView === "monthly" ? "monthly" : "weekly");
       setSpendingData(spending);
-      
-      // Update chart data
       if (spending.periodData) {
-        const labels = spending.periodData.map(d => d.label);
-        const values = spending.periodData.map(d => d.value);
-        setBudgetChartData({ labels, values });
+        setBudgetChartData({
+          labels: spending.periodData.map(d => d.label),
+          values: spending.periodData.map(d => d.value)
+        });
       }
     } catch (err) {
       console.error("Error loading budget analytics:", err);
-      // Use fallback data
-      const now = new Date();
-      const labels = [];
-      const values = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        values.push(Math.floor(Math.random() * 100) + 50);
-      }
-      setBudgetChartData({ labels, values });
     }
   }
 
@@ -478,22 +455,29 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   // ── Section 3 derived data ──
   const activeBudget = useMemo(() => {
     const now = new Date();
-    return budgetCaps.find(b => 
-      b.status === "active" && 
-      new Date(b.startDate) <= now && 
+    return budgetCaps.find(b =>
+      b.status === "active" &&
+      new Date(b.startDate) <= now &&
       new Date(b.endDate) >= now
     ) || null;
   }, [budgetCaps]);
 
+  const budgetCapDurationDays = useMemo(() => {
+    if (!activeBudget) return 0;
+    const ms = new Date(activeBudget.endDate).getTime() - new Date(activeBudget.startDate).getTime();
+    return Math.max(1, Math.round(ms / (24 * 60 * 60 * 1000)) + 1);
+  }, [activeBudget]);
+
+  const avgDaily = useMemo(() => activeBudget ? activeBudget.amount / budgetCapDurationDays : 0, [activeBudget, budgetCapDurationDays]);
+  const avgWeekly = useMemo(() => avgDaily * 7, [avgDaily]);
+  const avgMonthly = useMemo(() => avgDaily * 30, [avgDaily]);
+
   const remainingBudget = useMemo(() => {
     if (!activeBudget) return 0;
-    const spent = spendingData?.totalSpent || 0;
-    return Math.max(0, activeBudget.amount - spent);
-  }, [activeBudget, spendingData]);
+    return activeBudget.currentBudget;
+  }, [activeBudget]);
 
-  const canAddNextBudget = useMemo(() => {
-    return remainingBudget <= 0 || !activeBudget;
-  }, [remainingBudget, activeBudget]);
+  const canAddNextBudget = useMemo(() => !activeBudget, [activeBudget]);
 
   // ── Section 4 derived data ──
   const rangedOrders = useMemo(() => {
@@ -515,7 +499,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     setIsSavingBudget(true);
     setError(null);
     try {
-      const result = await createBudgetCap(token, {
+      await createBudgetCap(token, {
         amount: Number(newBudgetAmount),
         period: "custom",
         startDate: newBudgetStart,
@@ -525,11 +509,33 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
       setNewBudgetAmount("");
       setSuccessMsg("Budget cap added successfully!");
       setTimeout(() => setSuccessMsg(null), 3000);
-      await loadProfile();
+      await loadBudgetCaps();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add budget cap");
+      if (err instanceof ActiveBudgetCapError) {
+        setShowAddBudgetModal(false);
+        setBudgetCapConflict(err.activeCap);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to add budget cap");
+      }
     } finally {
       setIsSavingBudget(false);
+    }
+  }
+
+  async function handleDeleteBudgetCap() {
+    if (!capPendingDelete?._id) return;
+    setIsDeletingCap(true);
+    setError(null);
+    try {
+      await deleteBudgetCap(token, capPendingDelete._id);
+      setCapPendingDelete(null);
+      setSuccessMsg("Budget cap deleted.");
+      setTimeout(() => setSuccessMsg(null), 3000);
+      await loadBudgetCaps();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete budget cap");
+    } finally {
+      setIsDeletingCap(false);
     }
   }
 
@@ -655,13 +661,13 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
         <h2 className="pf-section-title">Budget Cap and Expense Tracking</h2>
         <div className="pf-budget-grid">
           <div className="pf-budget-chart-card">
-            <LineChart 
-              labels={budgetChartData.labels.length > 0 ? budgetChartData.labels : ["No Data"]} 
-              series={[{ 
-                label: "Budget", 
-                color: "#ff3131", 
-                values: budgetChartData.values.length > 0 ? budgetChartData.values : [0] 
-              }]} 
+            <LineChart
+              labels={budgetChartData.labels.length > 0 ? budgetChartData.labels : ["No Data"]}
+              series={[{
+                label: "Budget",
+                color: "#ff3131",
+                values: budgetChartData.values.length > 0 ? budgetChartData.values : [0]
+              }]}
             />
           </div>
           <div className="pf-budget-stats">
@@ -673,34 +679,88 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
                 customStart={budgetCustomStart}
                 customEnd={budgetCustomEnd}
                 onCustomChange={(s, e) => { setBudgetCustomStart(s); setBudgetCustomEnd(e); }}
+                options={["weekly", "monthly"]}
               />
             </div>
             <div className="pf-budget-numbers">
-              <div>
-                <strong>{activeBudget ? Math.round(activeBudget.amount / 30) : 0}</strong>
-                <label>AVG DAILY</label>
-              </div>
-              <div>
-                <strong>{activeBudget ? Math.round(activeBudget.amount / 4) : 0}</strong>
-                <label>AVG WEEKLY</label>
-              </div>
-              <div>
-                <strong>{activeBudget ? Math.round(activeBudget.amount) : 0}</strong>
-                <label>AVG MONTHLY</label>
-              </div>
+              <div><strong>{avgDaily.toFixed(2)}</strong><label>AVG DAILY</label></div>
+              <div><strong>{avgWeekly.toFixed(2)}</strong><label>AVG WEEKLY</label></div>
+              <div><strong>{avgMonthly.toFixed(2)}</strong><label>AVG MONTHLY</label></div>
             </div>
             <p className="pf-budget-remaining-label">Remaining Budget:</p>
             <p className="pf-budget-remaining-value">PHP {remainingBudget.toFixed(2)}</p>
-            <button
-              className="pf-btn pf-btn-white-outline"
-              disabled={!canAddNextBudget}
-              onClick={() => setShowAddBudgetModal(true)}
-              title={canAddNextBudget ? "" : "Available once your remaining budget hits Php 0.00"}
-            >
-              ADD NEXT BUDGET CAP
-            </button>
+            <div className="pf-budget-actions">
+              <button
+                className="pf-btn pf-btn-white-outline"
+                onClick={() => {
+                  if (activeBudget) {
+                    setBudgetCapConflict(activeBudget);
+                  } else {
+                    setShowAddBudgetModal(true);
+                  }
+                }}
+              >
+                ADD NEXT BUDGET CAP
+              </button>
+              <button
+                className="pf-btn pf-btn-white-outline"
+                onClick={() => setShowBudgetRecords(v => !v)}
+              >
+                {showBudgetRecords ? "HIDE BUDGET CAP RECORDS" : "BUDGET CAP RECORDS"}
+              </button>
+            </div>
           </div>
         </div>
+
+        {showBudgetRecords && (
+          <div className={`pf-budget-records-wrap ${showBudgetRecords ? "is-open" : ""}`}>
+            <div className="pf-budget-records-inner">
+              <div className="pf-budget-records">
+                <h3 className="pf-budget-records-title">Budget Cap Records</h3>
+                {budgetCaps.length === 0 ? (
+                  <p className="pf-empty pf-empty-light">No budget cap records yet.</p>
+                ) : (
+                  <table className="pf-budget-table">
+                    <thead>
+                      <tr>
+                        <th>Amount</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Status</th>
+                        <th>Surplus</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {budgetCaps.map((cap) => (
+                        <tr key={cap._id}>
+                          <td>PHP {cap.amount.toFixed(2)}</td>
+                          <td>{new Date(cap.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
+                          <td>{new Date(cap.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
+                          <td className={`pf-budget-status pf-budget-status-${cap.status}`}>{cap.status}</td>
+                          <td>
+                            {cap.status === "active" ? (
+                              <i className="fas fa-clock" title="Active — surplus pending" />
+                            ) : (
+                              <span className={cap.surplus >= 0 ? "pf-surplus-positive" : "pf-surplus-negative"}>
+                                {cap.surplus >= 0 ? "+" : ""}{cap.surplus.toFixed(2)}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <button className="pf-btn-icon pf-btn-icon-red" onClick={() => setCapPendingDelete(cap)} title="Delete">
+                              <i className="fas fa-trash" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ══════════════════════════ SECTION 4 — Order History ══════════════════════════ */}
@@ -888,6 +948,39 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
               <button className="pf-btn pf-btn-white-outline" onClick={() => setShowAddBudgetModal(false)} disabled={isSavingBudget}>Cancel</button>
               <button className="pf-btn pf-btn-yellow" onClick={handleAddBudgetCap} disabled={isSavingBudget}>
                 {isSavingBudget ? "Saving…" : "Add Budget Cap"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {budgetCapConflict && (
+        <div className="pf-modal-overlay" onClick={() => setBudgetCapConflict(null)}>
+          <div className="pf-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Budget Cap Already Active</h3>
+            <p>
+              A budget cap already exists for this time period (
+              {new Date(budgetCapConflict.startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              {" – "}
+              {new Date(budgetCapConflict.endDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              ). Please wait for it to end before adding a new one.
+            </p>
+            <div className="pf-modal-actions">
+              <button className="pf-btn pf-btn-yellow" onClick={() => setBudgetCapConflict(null)}>Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {capPendingDelete && (
+        <div className="pf-modal-overlay" onClick={() => setCapPendingDelete(null)}>
+          <div className="pf-modal pf-modal-danger" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Budget Cap?</h3>
+            <p>This will permanently remove this budget cap record. Are you sure you want to continue?</p>
+            <div className="pf-modal-actions">
+              <button className="pf-btn pf-btn-white-outline" onClick={() => setCapPendingDelete(null)} disabled={isDeletingCap}>Cancel</button>
+              <button className="pf-btn pf-btn-red" onClick={handleDeleteBudgetCap} disabled={isDeletingCap}>
+                {isDeletingCap ? "Deleting…" : "Yes, Delete"}
               </button>
             </div>
           </div>

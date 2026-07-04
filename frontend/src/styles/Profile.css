@@ -399,6 +399,80 @@
   cursor: pointer;
 }
 
+/* ── Budget action row (Add Next Budget Cap / Budget Cap Records) ── */
+.pf-budget-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* ── Budget Cap Records panel (expands the section when toggled open) ── */
+.pf-budget-records {
+  margin-top: 32px;
+  background: #f4efe3;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.pf-budget-records-title {
+  color: #1a1a1a;
+  font-weight: 800;
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+
+.pf-budget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.pf-budget-table th {
+  text-align: left;
+  color: #8a6a4a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0 12px 10px;
+  border-bottom: 2px solid rgba(138, 106, 74, 0.25);
+}
+
+.pf-budget-table td {
+  padding: 14px 12px;
+  color: #1a1a1a;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(138, 106, 74, 0.15);
+}
+
+.pf-budget-table tbody tr:last-child td { border-bottom: none; }
+.pf-budget-table tbody tr:hover { background: rgba(255, 199, 0, 0.12); }
+
+.pf-budget-status {
+  text-transform: capitalize;
+  font-weight: 800;
+}
+.pf-budget-status-active { color: #1a8f3c; }
+.pf-budget-status-accomplished { color: #2b6cb0; }
+.pf-budget-status-failed { color: #ff3131; }
+
+/* ── Small icon button (delete, in records table) ── */
+.pf-btn-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.pf-btn-icon:hover { transform: translateY(-1px); }
+.pf-btn-icon:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.pf-btn-icon-red { background: #ff3131; color: #fff; }
+
 /* ─────────────────────────── Responsive ─────────────────────────── */
 @media (max-width: 900px) {
   .pf-hero-content { flex-direction: column; align-items: flex-start; }
@@ -412,3 +486,35 @@
   .pf-hero-name { font-size: 34px; }
   .pf-order-row { grid-template-columns: 1fr; }
 }
+
+/* ── Smooth expand/collapse for Budget Cap Records ── */
+.pf-budget-records-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s ease;
+}
+.pf-budget-records-wrap.is-open {
+  grid-template-rows: 1fr;
+}
+.pf-budget-records-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.pf-budget-records {
+  margin-top: 32px;
+  background: #f4efe3;
+  border-radius: 16px;
+  padding: 24px;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.35s ease 0.05s, transform 0.35s ease 0.05s;
+}
+.pf-budget-records-wrap.is-open .pf-budget-records {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Surplus column ── */
+.pf-budget-table .fa-clock { color: #b8860b; font-size: 16px; }
+.pf-surplus-positive { color: #1a8f3c; font-weight: 800; }
+.pf-surplus-negative { color: #ff3131; font-weight: 800; }

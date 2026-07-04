@@ -19,13 +19,12 @@ export interface Budget {
 export interface StudentBudgetCap {
   _id?: string;
   amount: number;
+  currentBudget: number;
+  surplus: number;
   period: "daily" | "weekly" | "monthly" | "custom";
   startDate: string;
   endDate: string;
   status: "active" | "accomplished" | "failed";
-  spent?: number;
-  remaining?: number;
-  percentageUsed?: number;
 }
 
 export interface SpendingAnalytics {
@@ -38,6 +37,15 @@ export interface SpendingAnalytics {
     label: string;
     value: number;
   }>;
+}
+
+export class ActiveBudgetCapError extends Error {
+  activeCap: StudentBudgetCap;
+  constructor(message: string, activeCap: StudentBudgetCap) {
+    super(message);
+    this.name = "ActiveBudgetCapError";
+    this.activeCap = activeCap;
+  }
 }
 
 // ── Budget Functions ──────────────────────────────────────────────────
@@ -96,12 +104,13 @@ export async function createBudgetCap(token: string, data: {
 }): Promise<{ budgetCap: StudentBudgetCap }> {
   const response = await fetch(`${apiBaseUrl}/budgets/student/cap`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
   });
+  if (response.status === 409) {
+    const error = await response.json() as { message?: string; activeCap: StudentBudgetCap };
+    throw new ActiveBudgetCapError(error.message ?? "An active budget cap already exists.", error.activeCap);
+  }
   if (!response.ok) {
     const error = await response.json() as { message?: string };
     throw new Error(error.message ?? "Failed to create budget cap");
@@ -109,17 +118,23 @@ export async function createBudgetCap(token: string, data: {
   return response.json();
 }
 
+export async function deleteBudgetCap(token: string, capId: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${apiBaseUrl}/budgets/student/cap/${capId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(error.message ?? "Failed to delete budget cap");
+  }
+  return response.json();
+}
+
 export async function getSpendingAnalytics(
-  token: string, 
-  period: "daily" | "weekly" | "monthly" | "custom",
-  startDate?: string, 
-  endDate?: string
+  token: string,
+  period: "weekly" | "monthly"
 ): Promise<SpendingAnalytics> {
-  const params = new URLSearchParams();
-  params.append("period", period);
-  if (startDate) params.append("startDate", startDate);
-  if (endDate) params.append("endDate", endDate);
-  
+  const params = new URLSearchParams({ period });
   const response = await fetch(`${apiBaseUrl}/reports/spending?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
   });

@@ -5,8 +5,8 @@ const bcrypt = require("bcryptjs");
 require("dotenv/config");
 
 // ── Import Models ──────────────────────────────────────────────────────
-const { VendorModel } = require("../models/vendor.model");
-const { StallModel } = require("../models/stall.model");
+const { VendorModel } = require("../backend/models/vendor.model");
+const { StallModel } = require("../backend/models/stall.model");
 
 // ── Configuration ──────────────────────────────────────────────────────
 const DEFAULT_PASSWORD = "Vendor@123";

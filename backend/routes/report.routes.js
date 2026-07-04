@@ -116,81 +116,74 @@ reportRouter.get("/orders/course-distribution", auth_1.authenticateRequest, (0, 
 // ── STUDENT SPENDING ANALYTICS ──────────────────────────────────────────
 reportRouter.get("/spending", auth_1.authenticateRequest, async (request, response) => {
     const studentId = request.userId;
-    const { period, startDate, endDate } = request.query;
-    
+    const { period } = request.query;
+    const view = period === "monthly" ? "monthly" : "weekly"; // default to weekly, no more "custom"
+
     try {
         const now = new Date();
-        let start = new Date();
-        let labels = [];
-        
-        if (period === "weekly") {
-            start.setDate(start.getDate() - 7);
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                labels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
-            }
-        } else if (period === "monthly") {
-            start.setMonth(start.getMonth() - 1);
-            const days = Math.min(30, Math.floor((now - start) / (1000 * 60 * 60 * 24)));
-            for (let i = days; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-            }
-        } else if (period === "custom" && startDate && endDate) {
-            start = new Date(startDate);
-            const end = new Date(endDate);
-            const days = Math.min(30, Math.floor((end - start) / (1000 * 60 * 60 * 24)));
-            for (let i = 0; i <= days; i++) {
+        let start;
+        let labels;
+
+        if (view === "weekly") {
+            // Calendar week: Sunday → Saturday
+            const dayOfWeek = now.getDay(); // 0 = Sunday
+            start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+            labels = [];
+            for (let i = 0; i < 7; i++) {
                 const d = new Date(start);
-                d.setDate(d.getDate() + i);
-                labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                d.setDate(start.getDate() + i);
+                labels.push(d.toLocaleDateString("en-US", { weekday: "short" })); // Sun, Mon, ... Sat
+            }
+        } else {
+            // Calendar month, bucketed into 4 weeks
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            labels = ["Week 1", "Week 2", "Week 3", "Week 4"];
+        }
+
+        const query = {
+            studentId,
+            orderStatus: { $ne: "cancelled" },
+            createdAt: { $gte: start, $lte: now }
+        };
+
+        const orders = await models_1.OrderModel.find(query).select("totalAmount createdAt").lean();
+
+        const values = new Array(labels.length).fill(0);
+        let elapsedDays;
+
+        if (view === "weekly") {
+            elapsedDays = Math.min(7, Math.floor((now - start) / (24 * 60 * 60 * 1000)) + 1);
+            for (const order of orders) {
+                const dayIndex = Math.floor((order.createdAt - start) / (24 * 60 * 60 * 1000));
+                if (dayIndex >= 0 && dayIndex < 7) values[dayIndex] += order.totalAmount || 0;
+            }
+        } else {
+            elapsedDays = now.getDate(); // days elapsed so far this month
+            for (const order of orders) {
+                const dayOfMonth = order.createdAt.getDate(); // 1-31
+                const weekIndex = Math.min(3, Math.floor((dayOfMonth - 1) / 7)); // 0..3
+                values[weekIndex] += order.totalAmount || 0;
             }
         }
-        
-        const query = { 
-            studentId, 
-            orderStatus: { $ne: "cancelled" }
-        };
-        if (startDate) query.createdAt = { $gte: new Date(startDate) };
-        if (endDate) query.createdAt = { ...query.createdAt, $lte: new Date(endDate) };
-        if (!startDate && !endDate && period !== "custom") {
-            query.createdAt = { $gte: start };
-        }
-        
-        const orders = await models_1.OrderModel.find(query).select("totalAmount createdAt").lean();
-        
-        const dailySpending = {};
-        orders.forEach(order => {
-            const dateKey = order.createdAt.toISOString().split('T')[0];
-            dailySpending[dateKey] = (dailySpending[dateKey] || 0) + order.totalAmount;
-        });
-        
-        const values = labels.map(label => {
-            const dateStr = getDateStrFromLabel(label);
-            return dailySpending[dateStr] || 0;
-        });
-        
-        const totalSpent = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-        const daysInPeriod = labels.length || 1;
-        const dailyAvg = totalSpent / daysInPeriod;
+
+        const totalSpent = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+        const dailyAvg = totalSpent / Math.max(1, elapsedDays);
         const weeklyAvg = dailyAvg * 7;
         const monthlyAvg = dailyAvg * 30;
-        
+
         const student = await models_1.StudentModel.findById(studentId).select("budgetCap").lean();
         let remaining = 0;
         if (student?.budgetCap) {
-            const activeBudget = student.budgetCap.find(b => 
-                b.status === "active" && 
-                new Date(b.startDate) <= now && 
+            const activeBudget = student.budgetCap.find(b =>
+                b.status === "active" &&
+                new Date(b.startDate) <= now &&
                 new Date(b.endDate) >= now
             );
             if (activeBudget) {
                 remaining = Math.max(0, activeBudget.amount - totalSpent);
             }
         }
-        
+
         response.json({
             daily: dailyAvg,
             weekly: weeklyAvg,

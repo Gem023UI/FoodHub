@@ -15,6 +15,8 @@ const COURSES = [
 
 const budgetCapSchema = new mongoose_1.Schema({
   amount: { type: Number, required: true, min: 0 },
+  currentBudget: { type: Number, required: true, default: 0 }, // deducted as orders come in; can go negative
+  surplus: { type: Number, default: 0 },                       // set once the cap period ends; can be negative
   period: { 
     type: String, 
     required: true,
