@@ -1,106 +1,71 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { getStalls, getStallDetails, getStallProductsByCategory } from "../services/stall.service";
+import { ProductCard } from "../components/ProductCard";
+import { getStallDetails } from "../services/stall.service";
 import tupLogo from "../../images/Logo.png";
 import "../styles/Stalls.css";
 
-interface StallsPageProps {
-  token?: string;
-  onNavigate: (page: string, data?: any) => void;
-  stallId?: string;
-}
-
-const SECTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const PRODUCT_CATEGORIES = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
 
-export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
-  const [stalls, setStalls] = useState<any[]>([]);
-  const [selectedStall, setSelectedStall] = useState<any>(null);
-  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+interface StallPageProps {
+  stallId: string;
+  token?: string;
+  onNavigate: (page: string, data?: any) => void;
+  onLogout?: () => void;
+}
+
+export function Stall({ stallId, token, onNavigate, onLogout }: StallPageProps) {
+  const [stall, setStall] = useState<any>(null);
+  const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [stallProducts, setStallProducts] = useState<Record<string, any[]>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
 
   useEffect(() => {
-    loadStalls();
-  }, []);
+    if (stallId) loadStall();
+  }, [stallId]);
 
-  useEffect(() => {
-    if (stallId && stalls.length > 0) {
-      const stall = stalls.find(s => s._id === stallId);
-      if (stall) {
-        handleStallSelect(stall);
-      }
-    }
-  }, [stallId, stalls]);
-
-  async function loadStalls() {
+  async function loadStall() {
     setIsLoading(true);
     try {
-      const data = await getStalls();
-      const activeStalls = data.filter(s => s.status === true);
-      setStalls(activeStalls);
-      
-      const productMap: Record<string, any[]> = {};
-      for (const stall of activeStalls) {
-        try {
-          const details = await getStallDetails(stall._id);
-          productMap[stall._id] = details.products || [];
-        } catch (err) {
-          console.error(`Error loading products for ${stall.stallName}:`, err);
-          productMap[stall._id] = [];
-        }
-      }
-      setStallProducts(productMap);
-    } catch (error) {
-      console.error("Error loading stalls:", error);
+      const data = await getStallDetails(stallId);
+      setStall(data);
+      setProducts(data.products || []);
+    } catch (err) {
+      console.error("Error loading stall:", err);
     } finally {
       setIsLoading(false);
     }
   }
 
-  const handleStallSelect = async (stall: any) => {
-    setSelectedStall(stall);
-    setSelectedCategory("All");
-    
-    try {
-      const details = await getStallDetails(stall._id);
-      setSelectedProducts(details.products || []);
-      setStallProducts(prev => ({
-        ...prev,
-        [stall._id]: details.products || []
-      }));
-    } catch (err) {
-      console.error("Error loading stall details:", err);
-      setSelectedProducts([]);
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      setSearchResults(null);
+      return;
     }
-  };
+    const filtered = products.filter((p) =>
+      p.productName?.toLowerCase().includes(query) ||
+      p.category?.toLowerCase().includes(query)
+    );
+    setSearchResults(filtered);
+  }
 
-  const handleCategoryFilter = async (category: string) => {
-    setSelectedCategory(category);
-    if (!selectedStall) return;
-    
-    if (category === "All") {
-      const details = await getStallDetails(selectedStall._id);
-      setSelectedProducts(details.products || []);
-    } else {
-      const products = await getStallProductsByCategory(selectedStall._id, category);
-      setSelectedProducts(products);
-    }
-  };
+  function clearSearch() {
+    setSearchQuery("");
+    setSearchResults(null);
+  }
 
-  const stallsBySection = stalls.reduce((acc, stall) => {
-    const section = stall.section || 1;
-    if (!acc[section]) acc[section] = [];
-    acc[section].push(stall);
-    return acc;
-  }, {} as Record<number, any[]>);
+  function productsByCategory(category: string) {
+    return products.filter((p) => p.category === category && p.available !== false);
+  }
 
   if (isLoading) {
     return (
-      <div className="stalls-page">
-        <div className="stalls-loading">
+      <div className="stall-page">
+        <div className="stall-page-loading">
           <Loader />
         </div>
         <Footer onNavigate={onNavigate} />
@@ -108,172 +73,135 @@ export function Stalls({ token, onNavigate, stallId }: StallsPageProps) {
     );
   }
 
-  return (
-    <div className="stalls-page">
-      <div className="stalls-container">
-        <h1 className="stalls-title">Canteen Map</h1>
-        <p className="stalls-subtitle">Click a section to view available stalls</p>
-
-        {/* Map Grid */}
-        <div className="stalls-map">
-          {SECTIONS.map((sectionNum) => {
-            const sectionStalls = stallsBySection[sectionNum] || [];
-            const hasStalls = sectionStalls.length > 0;
-
-            return (
-              <div
-                key={sectionNum}
-                className={`stalls-map-section ${hasStalls ? "has-stalls" : "empty"}`}
-                style={{ 
-                  backgroundColor: hasStalls ? `#ff313122` : "#f5f5f5",
-                  borderColor: "#ff3131" 
-                }}
-                onClick={() => {
-                  if (hasStalls && sectionStalls.length === 1) {
-                    handleStallSelect(sectionStalls[0]);
-                  } else if (hasStalls) {
-                    handleStallSelect(sectionStalls[0]);
-                  }
-                }}
-              >
-                <div className="section-label" style={{ color: "#ff3131" }}>
-                  Section {sectionNum}
-                </div>
-                {hasStalls ? (
-                  <div className="section-stalls">
-                    {sectionStalls.slice(0, 3).map((stall) => (
-                      <div 
-                        key={stall._id} 
-                        className="section-stall-item"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStallSelect(stall);
-                        }}
-                      >
-                        {stall.stallName}
-                      </div>
-                    ))}
-                    {sectionStalls.length > 3 && (
-                      <div className="section-stall-more">+{sectionStalls.length - 3} more</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="section-empty">No stalls</div>
-                )}
-              </div>
-            );
-          })}
+  if (!stall) {
+    return (
+      <div className="stall-page">
+        <div className="stall-page-error">
+          <h2>Stall Not Found</h2>
+          <p>The stall you're looking for doesn't exist or is unavailable.</p>
+          <button className="stall-page-back-btn" onClick={() => onNavigate("stalls")}>
+            Browse Stalls
+          </button>
         </div>
+        <Footer onNavigate={onNavigate} />
+      </div>
+    );
+  }
 
-        {/* Selected Stall Details */}
-        {selectedStall && (
-          <div className="stall-details">
-            <div className="stall-details-header">
-              <h2>{selectedStall.stallName}</h2>
-              <button 
-                className="stall-details-close" 
-                onClick={() => setSelectedStall(null)}
-              >
-                ✕
+  return (
+    <div className="stall-page">
+      {/* ─── HEADER ─── */}
+      <section
+        className="stall-hero"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.55)), url(${stall.stallPicture || tupLogo})`,
+        }}
+      >
+        <div className="stall-hero-content">
+          <p className="stall-hero-welcome">Welcome to,</p>
+          <h1 className="stall-hero-name">{stall.stallName}</h1>
+          {stall.stallDescription && (
+            <p className="stall-hero-desc">{stall.stallDescription}</p>
+          )}
+          <p className="stall-hero-section">Section {stall.section}</p>
+          {stall.openHours && (
+            <p className="stall-hero-hours">
+              <i className="fas fa-clock"></i> {stall.openHours.openTime} - {stall.openHours.closingTime}
+            </p>
+          )}
+          <div className="stall-hero-payments">
+            <span className="stall-hero-payments-label">Payment Method Available:</span>
+            <span className="stall-hero-payments-list">
+              {[
+                stall.paymentMethod?.cash?.available && "Cash",
+                stall.paymentMethod?.gcash?.available && "GCash",
+                stall.paymentMethod?.paymaya?.available && "Maya",
+              ]
+                .filter(Boolean)
+                .join(", ") || "Not specified"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── SEARCH SECTION (yellow, expands) ─── */}
+      <section className={`stall-search-section ${searchResults !== null ? "expanded" : ""}`}>
+        <div className="stall-search-container">
+          <h2 className="stall-search-title">Search {stall.stallName}'s Menu</h2>
+          <form className="stall-search-form" onSubmit={handleSearch}>
+            <div className="stall-search-input-wrapper">
+              <i className="fas fa-search search-icon"></i>
+              <input
+                type="text"
+                placeholder="Search for food or category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="stall-search-input"
+              />
+              <button type="submit" className="stall-search-btn">
+                Search
               </button>
             </div>
-            
-            <div className="stall-details-info">
-              <p><strong>Section:</strong> {selectedStall.section}</p>
-              <p><strong>Hours:</strong> {selectedStall.openHours?.openTime} - {selectedStall.openHours?.closingTime}</p>
-              {selectedStall.stallDescription && (
-                <p><strong>Description:</strong> {selectedStall.stallDescription}</p>
-              )}
-              {selectedStall.isInOperation !== undefined && (
-                <p>
-                  <strong>Status:</strong> 
-                  <span className={selectedStall.isInOperation ? "status-open" : "status-closed"}>
-                    {selectedStall.isInOperation ? " In Operation" : " Closed"}
-                  </span>
-                </p>
-              )}
-            </div>
-
-            {/* Category Filters */}
-            <div className="category-filters">
-              <button
-                className={`category-chip ${selectedCategory === "All" ? "active" : ""}`}
-                onClick={() => handleCategoryFilter("All")}
-              >
-                All
+            {searchResults !== null && (
+              <button type="button" className="stall-clear-search" onClick={clearSearch}>
+                Clear Search
               </button>
-              {PRODUCT_CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  className={`category-chip ${selectedCategory === cat ? "active" : ""}`}
-                  onClick={() => handleCategoryFilter(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            )}
+          </form>
 
-            {selectedProducts.length > 0 && (
-              <div className="stall-products">
-                <h3>Menu Items ({selectedProducts.length})</h3>
-                <div className="stall-products-grid">
-                  {selectedProducts.map((product) => (
-                    <div 
-                      key={product._id} 
-                      className="stall-product-item"
-                      onClick={() => onNavigate(`product/${product._id}`)}
-                    >
-                      <div className="product-item-image">
-                        <img 
-                          src={product.productImages?.[0] || "https://via.placeholder.com/100x100?text=No+Image"} 
-                          alt={product.productName}
-                        />
-                      </div>
-                      <div className="product-item-info">
-                        <h4>{product.productName}</h4>
-                        <p className="product-item-price">₱{product.price.toFixed(2)}</p>
-                        {product.available ? (
-                          <span className="product-item-available">Available</span>
-                        ) : (
-                          <span className="product-item-unavailable">Unavailable</span>
-                        )}
-                      </div>
-                    </div>
+          {searchResults !== null && (
+            <div className="stall-search-results">
+              <p className="stall-results-count">
+                {searchResults.length === 0
+                  ? "No matching items found"
+                  : `Showing ${searchResults.length} result${searchResults.length === 1 ? "" : "s"}`}
+              </p>
+              {searchResults.length > 0 && (
+                <div className="stall-search-results-grid">
+                  {searchResults.map((product) => (
+                    <ProductCard
+                      key={product._id}
+                      product={product}
+                      token={token || undefined}
+                      onClick={() => onNavigate("product", product._id)}
+                    />
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ─── PRODUCTS BY CATEGORY (white) ─── */}
+      <section className="stall-products-section">
+        {PRODUCT_CATEGORIES.map((category) => {
+          const items = productsByCategory(category);
+          if (items.length === 0) return null;
+          return (
+            <div className="stall-category-block" key={category}>
+              <h2 className="stall-category-title">{category}</h2>
+              <div className="stall-category-rail">
+                {items.map((product) => (
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    token={token || undefined}
+                    onClick={() => onNavigate("product", product._id)}
+                  />
+                ))}
               </div>
-            )}
+            </div>
+          );
+        })}
+        {products.length === 0 && (
+          <div className="stall-no-products">
+            <div className="stall-no-products-icon">🍽️</div>
+            <h3>No products available yet</h3>
+            <p>Check back later for this stall's menu.</p>
           </div>
         )}
-
-        {/* All Stalls List */}
-        <div className="all-stalls">
-          <h2>All Stalls</h2>
-          <div className="all-stalls-grid">
-            {stalls.map((stall) => (
-              <div 
-                key={stall._id} 
-                className="all-stall-item"
-                onClick={() => handleStallSelect(stall)}
-              >
-                <div className="all-stall-image">
-                  <img 
-                    src={stall.stallPicture || tupLogo} 
-                    alt={stall.stallName}
-                  />
-                </div>
-                <div className="all-stall-info">
-                  <h3>{stall.stallName}</h3>
-                  <p>Section {stall.section}</p>
-                  <span className={`all-stall-status ${stall.status ? "active" : "inactive"}`}>
-                    {stall.status ? "Open" : "Closed"}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      </section>
 
       <Footer onNavigate={onNavigate} />
     </div>

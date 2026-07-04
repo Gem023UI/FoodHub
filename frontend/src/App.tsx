@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { LandingPage } from "./pages/LandingPage";
 import { Login } from "./pages/Login";
-import { Stalls } from "./pages/Stalls";
+import { Stalls } from "./pages/StallsMap";
 import { Product } from "./pages/Product";
 import { Cart } from "./pages/Cart";
 import Preorder from "./pages/PreOrder";
@@ -12,6 +12,7 @@ import { AdminVendors } from "./pages/AdminVendors";
 import { AdminStudents } from "./pages/AdminStudents";
 import { AdminProfile } from "./pages/AdminProfile";
 import { VendorStallPage } from "./pages/VendorStall";
+import { Stall } from "./pages/Stalls";
 import { VendorProducts } from "./pages/VendorProducts";
 import { VendorOrders } from "./pages/VendorOrders";
 import { VendorRevenue } from "./pages/VendorRevenue";
@@ -190,7 +191,9 @@ function App() {
       case "login":
         return <Login onLogin={handleLogin} onNavigate={navigateTo} />;
       case "stalls":
-        return <Stalls token={token || undefined} onNavigate={navigateTo} stallId={pageData?.stallId} />;
+         return <Stalls token={token || undefined} onNavigate={navigateTo} stallId={pageData?.stallId} />;
+       case "stall":
+         return <Stall stallId={pageData} token={token || undefined} onNavigate={navigateTo} onLogout={handleLogout} />;
       case "product":
         return <Product token={token || undefined} productId={pageData} onNavigate={navigateTo} onLogout={handleLogout} />;
       case "cart":

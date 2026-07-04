@@ -1,22 +1,16 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import { ProductCard } from "../components/ProductCard";
+import { StallCard } from "../components/StallCard";
 import { getStalls } from "../services/stall.service";
 import { getProductsByStall } from "../services/product.service";
 import tupLogo from "../../images/Logo.png";
 import "../styles/LandingPage.css";
 
-// Product categories from the model
-const PRODUCT_CATEGORIES = [
-    "All",
-    "Rice Meal",
-    "Beverage",
-    "Snacks",
-    "Add-ons"
-];
+const PRODUCT_CATEGORIES = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
 
 interface LandingPageProps {
-    onNavigate: (page: string) => void;
+    onNavigate: (page: string, data?: any) => void;
     token?: string | null;
     onLogout?: () => void;
 }
@@ -24,18 +18,14 @@ interface LandingPageProps {
 export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
     const [stalls, setStalls] = useState<any[]>([]);
     const [allProducts, setAllProducts] = useState<any[]>([]);
-    const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
-    const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ 
-        min: 0, 
-        max: 200 
-    });
+    const [searchResults, setSearchResults] = useState<any[] | null>(null);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [animating, setAnimating] = useState(false);
 
-        const heroImages = [
+    const heroImages = [
         "/images/foods/beverage.png",
         "/images/foods/burger.png",
         "/images/foods/crispybite.png",
@@ -69,25 +59,17 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
         loadData();
     }, []);
 
-    // Filter products whenever search, category, or price range changes
-    useEffect(() => {
-        filterProducts();
-    }, [searchQuery, selectedCategory, priceRange, allProducts]);
-
     async function loadData() {
         setIsLoading(true);
         try {
             const stallData = await getStalls();
-            // Filter stalls that are open (status === true)
             const openStalls = stallData.filter(s => s.status === true);
             setStalls(openStalls);
 
-            // Get all products from open stalls
             const allProductsData: any[] = [];
             for (const stall of openStalls) {
                 try {
                     const products = await getProductsByStall(stall._id, { available: true });
-                    // Add stall info to each product
                     const productsWithStall = products.map(p => ({
                         ...p,
                         stallId: stall._id,
@@ -100,7 +82,6 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                 }
             }
             setAllProducts(allProductsData);
-            setFilteredProducts(allProductsData);
         } catch (error) {
             console.error("Error loading data:", error);
         } finally {
@@ -108,53 +89,41 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
         }
     }
 
-    function filterProducts() {
-        let filtered = [...allProducts];
+    function productsByCategory(category: string) {
+        return allProducts.filter(p => p.category === category);
+    }
 
-        // Filter by search query
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase().trim();
-            filtered = filtered.filter(p => 
+    function handleSearch(e: React.FormEvent) {
+        e.preventDefault();
+        const query = searchQuery.trim().toLowerCase();
+        if (!query && selectedCategory === "All") {
+            setSearchResults(null);
+            return;
+        }
+        let filtered = [...allProducts];
+        if (query) {
+            filtered = filtered.filter(p =>
                 p.productName?.toLowerCase().includes(query) ||
                 p.productDescription?.toLowerCase().includes(query) ||
                 p.category?.toLowerCase().includes(query) ||
                 p.stallName?.toLowerCase().includes(query)
             );
         }
-
-        // Filter by category
         if (selectedCategory !== "All") {
             filtered = filtered.filter(p => p.category === selectedCategory);
         }
-
-        // Filter by price range
-        filtered = filtered.filter(p => 
-            p.price >= priceRange.min && p.price <= priceRange.max
-        );
-
-        setFilteredProducts(filtered);
+        setSearchResults(filtered);
     }
 
-    function handleSearch(e: React.FormEvent) {
-        e.preventDefault();
-        filterProducts();
-    }
-
-    function handleCategoryChange(category: string) {
-        setSelectedCategory(category);
-    }
-
-    function handlePriceChange(type: "min" | "max", value: string) {
-        const numValue = Number(value) || 0;
-        setPriceRange(prev => ({
-            ...prev,
-            [type]: numValue
-        }));
+    function clearSearch() {
+        setSearchQuery("");
+        setSelectedCategory("All");
+        setSearchResults(null);
     }
 
     return (
         <div className="landing-page">
-            {/* ─── HERO ─── */}
+            {/* ─── HERO SECTION ─── */}
             <section className="lp-hero">
                 <div className="lp-hero-image">
                     <div className="lp-hero-slideshow">
@@ -176,18 +145,87 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                         and skip the queue — fresh food, faster.
                     </p>
                     <button className="lp-hero-btn" onClick={() => {
-                        document.getElementById('search-section')?.scrollIntoView({ behavior: 'smooth' });
+                        document.getElementById('lp-product-section')?.scrollIntoView({ behavior: 'smooth' });
                     }}>
                         Explore Now
                     </button>
                 </div>
             </section>
 
-            {/* ─── SEARCH AND FILTER SECTION ─── */}
-            <section id="search-section" className="lp-search-section">
+            {/* ─── PRODUCT SECTION (white, 4 category rails) ─── */}
+            <section className="lp-product-section" id="lp-product-section">
+                <div className="lp-section-header">
+                    <h2 className="lp-section-title">What's Cooking Today</h2>
+                </div>
+
+                {isLoading ? (
+                    <div className="loading-text">Loading products...</div>
+                ) : (
+                    <>
+                        {PRODUCT_CATEGORIES.map((category) => {
+                            const items = productsByCategory(category);
+                            if (items.length === 0) return null;
+                            return (
+                                <div className="lp-category-block" key={category}>
+                                    <h3 className="lp-category-title">{category}</h3>
+                                    <div className="lp-category-rail">
+                                        {items.map((product) => (
+                                            <ProductCard
+                                                key={product._id}
+                                                product={product}
+                                                token={token || undefined}
+                                                onClick={() => onNavigate("product", product._id)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {allProducts.length === 0 && (
+                            <div className="empty-products">
+                                <div className="empty-icon">🍽️</div>
+                                <h3>No products found</h3>
+                                <p>Check back soon for available items.</p>
+                            </div>
+                        )}
+                    </>
+                )}
+            </section>
+
+            {/* ─── STALL SECTION (orange) ─── */}
+            <section className="lp-stall-section">
+                <div className="lp-section-header">
+                    <h2 className="lp-section-title lp-section-title-light">Available Stalls</h2>
+                    <button className="lp-see-all" onClick={() => onNavigate("stalls")}>
+                        See All →
+                    </button>
+                </div>
+                {isLoading ? (
+                    <div className="loading-text loading-text-light">Loading stalls...</div>
+                ) : stalls.length === 0 ? (
+                    <div className="empty-products">
+                        <div className="empty-icon">🏪</div>
+                        <h3>No stalls open right now</h3>
+                        <p>Check back during canteen hours.</p>
+                    </div>
+                ) : (
+                    <div className="lp-stalls-rail">
+                        {stalls.slice(0, 8).map((stall) => (
+                            <StallCard
+                                key={stall._id}
+                                stall={stall}
+                                onClick={() => onNavigate("stall", stall._id)}
+                            />
+                        ))}
+                    </div>
+                )}
+            </section>
+
+            {/* ─── SEARCH SECTION (yellow, expands on search) ─── */}
+            <section className={`lp-search-section ${searchResults !== null ? "expanded" : ""}`} id="search-section">
                 <div className="lp-search-container">
                     <h2 className="lp-search-title">Find Your Favorite Food</h2>
-                    
+
                     <form className="lp-search-form" onSubmit={handleSearch}>
                         <div className="lp-search-input-wrapper">
                             <i className="fas fa-search search-icon"></i>
@@ -202,147 +240,57 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                                 Search
                             </button>
                         </div>
-                        
+
                         <div className="lp-filters">
                             <div className="lp-filter-group">
                                 <label className="lp-filter-label">Category</label>
                                 <select
                                     value={selectedCategory}
-                                    onChange={(e) => handleCategoryChange(e.target.value)}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
                                     className="lp-filter-select"
                                 >
+                                    <option value="All">All</option>
                                     {PRODUCT_CATEGORIES.map(cat => (
                                         <option key={cat} value={cat}>{cat}</option>
                                     ))}
                                 </select>
                             </div>
-                            
-                            <div className="lp-filter-group">
-                                <label className="lp-filter-label">Price Range</label>
-                                <div className="lp-price-inputs">
-                                    <input
-                                        type="number"
-                                        placeholder="Min"
-                                        value={priceRange.min || ""}
-                                        onChange={(e) => handlePriceChange("min", e.target.value)}
-                                        className="lp-price-input"
-                                        min="0"
-                                    />
-                                    <span className="lp-price-separator">-</span>
-                                    <input
-                                        type="number"
-                                        placeholder="Max"
-                                        value={priceRange.max || ""}
-                                        onChange={(e) => handlePriceChange("max", e.target.value)}
-                                        className="lp-price-input"
-                                        min="0"
-                                    />
-                                </div>
-                            </div>
-                            
-                            {(searchQuery || selectedCategory !== "All" || priceRange.min > 0 || priceRange.max < 200) && (
-                                <button 
-                                    type="button" 
+
+                            {searchResults !== null && (
+                                <button
+                                    type="button"
                                     className="lp-clear-filters"
-                                    onClick={() => {
-                                        setSearchQuery("");
-                                        setSelectedCategory("All");
-                                        setPriceRange({ min: 0, max: 200 });
-                                    }}
+                                    onClick={clearSearch}
                                 >
-                                    Clear Filters
+                                    Clear Search
                                 </button>
                             )}
                         </div>
                     </form>
-                    
-                    <div className="lp-results-count">
-                        {isLoading ? (
-                            <span>Loading products...</span>
-                        ) : (
-                            <span>Showing {filteredProducts.length} products</span>
-                        )}
-                    </div>
+
+                    {searchResults !== null && (
+                        <div className="lp-search-results">
+                            <div className="lp-results-count">
+                                {searchResults.length === 0
+                                    ? "No products found"
+                                    : `Showing ${searchResults.length} product${searchResults.length === 1 ? "" : "s"}`}
+                            </div>
+                            {searchResults.length > 0 && (
+                                <div className="lp-products-grid">
+                                    {searchResults.map((product) => (
+                                        <ProductCard
+                                            key={product._id}
+                                            product={product}
+                                            token={token || undefined}
+                                            onClick={() => onNavigate("product", product._id)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </section>
-
-            {/* ─── PRODUCTS GRID ─── */}
-            <section className="lp-products-section">
-                {isLoading ? (
-                    <div className="loading-text">Loading products...</div>
-                ) : filteredProducts.length === 0 ? (
-                    <div className="empty-products">
-                        <div className="empty-icon">🍽️</div>
-                        <h3>No products found</h3>
-                        <p>Try adjusting your search or filters</p>
-                    </div>
-                ) : (
-                    <div className="lp-products-grid">
-                        {filteredProducts.slice(0, 12).map((product) => (
-                            <ProductCard
-                                key={product._id}
-                                product={product}
-                                token={token || undefined}
-                                onClick={() => onNavigate(`product/${product._id}`)}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            {/* ─── STALLS SECTION ─── */}
-            {!isLoading && stalls.length > 0 && (
-                <section className="lp-featured">
-                    <div className="lp-featured-header">
-                        <h2 className="lp-section-title">Available Stalls</h2>
-                        <button className="lp-see-all" onClick={() => onNavigate("stalls")}>
-                            See All →
-                        </button>
-                    </div>
-                    <div className="lp-stalls-grid">
-                        {stalls.slice(0, 4).map((stall) => (
-                            <div 
-                                className="lp-stall-card" 
-                                key={stall._id} 
-                                onClick={() => onNavigate(`stall/${stall._id}`)}
-                            >
-                                <div className="lp-stall-img-wrap">
-                                    <img 
-                                        src={stall.stallPicture || tupLogo} 
-                                        alt={stall.stallName} 
-                                        className="lp-stall-img" 
-                                    />
-                                    {stall.status && (
-                                        <span className="lp-stall-badge">Open</span>
-                                    )}
-                                </div>
-                                <div className="lp-stall-info">
-                                    <h3 className="lp-stall-name">{stall.stallName}</h3>
-                                    <p className="lp-stall-tag">Section {stall.section}</p>
-                                    <p className="lp-stall-location">
-                                        <i className="fas fa-clock"></i> 
-                                        {stall.openHours?.openTime} - {stall.openHours?.closingTime || "Check hours"}
-                                    </p>
-                                    <div className="lp-stall-footer">
-                                        <span className="lp-stall-price">
-                                            {stall.products?.length || 0} items
-                                        </span>
-                                        <button
-                                            className="lp-stall-order-btn"
-                                            onClick={(e) => { 
-                                                e.stopPropagation(); 
-                                                onNavigate(`stall/${stall._id}`);
-                                            }}
-                                        >
-                                            View Menu
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-            )}
 
             {/* ─── HOW IT WORKS ─── */}
             <section className="lp-bottom-row">

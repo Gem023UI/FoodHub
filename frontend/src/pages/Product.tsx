@@ -206,7 +206,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
   if (error || !product) {
     return (
       <div className="product-page">
-        <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="home" />
         <div className="product-error">
           <h2>Product Not Found</h2>
           <p>{error || "The product you're looking for doesn't exist."}</p>
@@ -224,8 +223,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
 
   return (
     <div className="product-page">
-      <Header onNavigate={onNavigate} token={token} onLogout={onLogout} currentPage="home" />
-
       <div className="product-container">
         <button className="btn-back" onClick={() => onNavigate("stalls")}>
           ← Back to Stalls
@@ -279,7 +276,7 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
 
             <div className="product-meta">
               <span className="product-price">₱{product.price.toFixed(2)}</span>
-              <span className="product-stall" onClick={() => onNavigate(`stall/${stallId}`)}>
+              <span className="product-stall" onClick={() => onNavigate("stall", stallId)}>
                 <i className="fas fa-store"></i> {stallName}
               </span>
               {product.averageRating > 0 && (
