@@ -56,6 +56,17 @@ export interface Order {
   updatedAt: string;
 }
 
+export class OverBudgetError extends Error {
+  currentBudget: number;
+  totalAmount: number;
+  constructor(message: string, currentBudget: number, totalAmount: number) {
+    super(message);
+    this.name = "OverBudgetError";
+    this.currentBudget = currentBudget;
+    this.totalAmount = totalAmount;
+  }
+}
+
 // ── Order Functions ────────────────────────────────────────────────────
 export async function createOrder(
   token: string,
@@ -63,8 +74,9 @@ export async function createOrder(
     stallId: string;
     items: Array<{ productId: string; quantity: number }>;
     paymentMethod: "cash" | "gcash" | "paymaya";
+    confirmOverBudget?: boolean;
   }
-): Promise<{ order: Order }> {
+): Promise<{ order: Order; currentBudget: number | null }> {
   const response = await fetch(`${apiBaseUrl}/orders`, {
     method: "POST",
     headers: {
@@ -73,7 +85,16 @@ export async function createOrder(
     },
     body: JSON.stringify(orderData),
   });
-  
+
+  if (response.status === 409) {
+    const data = await response.json() as { message?: string; currentBudget: number; totalAmount: number };
+    throw new OverBudgetError(
+      data.message ?? "This order exceeds your current budget.",
+      data.currentBudget,
+      data.totalAmount
+    );
+  }
+
   if (!response.ok) {
     const data = await response.json() as { message?: string };
     throw new Error(data.message ?? "Failed to create order");

@@ -20,7 +20,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
     const [allProducts, setAllProducts] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("All");
+    const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 200 });
     const [searchResults, setSearchResults] = useState<any[] | null>(null);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [animating, setAnimating] = useState(false);
@@ -96,7 +96,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
     function handleSearch(e: React.FormEvent) {
         e.preventDefault();
         const query = searchQuery.trim().toLowerCase();
-        if (!query && selectedCategory === "All") {
+        if (!query && priceRange.min === 0 && priceRange.max === 200) {
             setSearchResults(null);
             return;
         }
@@ -109,15 +109,18 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                 p.stallName?.toLowerCase().includes(query)
             );
         }
-        if (selectedCategory !== "All") {
-            filtered = filtered.filter(p => p.category === selectedCategory);
-        }
+        filtered = filtered.filter(p => p.price >= priceRange.min && p.price <= priceRange.max);
         setSearchResults(filtered);
+    }
+
+    function handlePriceChange(type: "min" | "max", value: string) {
+        const numValue = Number(value) || 0;
+        setPriceRange(prev => ({ ...prev, [type]: numValue }));
     }
 
     function clearSearch() {
         setSearchQuery("");
-        setSelectedCategory("All");
+        setPriceRange({ min: 0, max: 200 });
         setSearchResults(null);
     }
 
@@ -227,45 +230,52 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                     <h2 className="lp-search-title">Find Your Favorite Food</h2>
 
                     <form className="lp-search-form" onSubmit={handleSearch}>
-                        <div className="lp-search-input-wrapper">
-                            <i className="fas fa-search search-icon"></i>
-                            <input
-                                type="text"
-                                placeholder="Search for food, stall, or category..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="lp-search-input"
-                            />
+                        <div className="lp-search-row">
+                            <div className="lp-search-input-wrapper">
+                                <i className="fas fa-search search-icon"></i>
+                                <input
+                                    type="text"
+                                    placeholder="Search for food, stall, or category..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="lp-search-input"
+                                />
+                            </div>
+
+                            <div className="lp-price-inputs">
+                                <input
+                                    type="number"
+                                    placeholder="Min"
+                                    value={priceRange.min || ""}
+                                    onChange={(e) => handlePriceChange("min", e.target.value)}
+                                    className="lp-price-input"
+                                    min="0"
+                                />
+                                <span className="lp-price-separator">-</span>
+                                <input
+                                    type="number"
+                                    placeholder="Max"
+                                    value={priceRange.max || ""}
+                                    onChange={(e) => handlePriceChange("max", e.target.value)}
+                                    className="lp-price-input"
+                                    min="0"
+                                />
+                            </div>
+
                             <button type="submit" className="lp-search-btn">
                                 Search
                             </button>
                         </div>
 
-                        <div className="lp-filters">
-                            <div className="lp-filter-group">
-                                <label className="lp-filter-label">Category</label>
-                                <select
-                                    value={selectedCategory}
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="lp-filter-select"
-                                >
-                                    <option value="All">All</option>
-                                    {PRODUCT_CATEGORIES.map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {searchResults !== null && (
-                                <button
-                                    type="button"
-                                    className="lp-clear-filters"
-                                    onClick={clearSearch}
-                                >
-                                    Clear Search
-                                </button>
-                            )}
-                        </div>
+                        {searchResults !== null && (
+                            <button
+                                type="button"
+                                className="lp-clear-filters"
+                                onClick={clearSearch}
+                            >
+                                Clear Search
+                            </button>
+                        )}
                     </form>
 
                     {searchResults !== null && (

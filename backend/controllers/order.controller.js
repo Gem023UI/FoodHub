@@ -15,7 +15,7 @@ const mongoose_1 = require("mongoose");
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 async function createOrder(data) {
-    const { studentId, stallId, items, paymentMethod } = data;
+    const { studentId, stallId, items, paymentMethod, confirmOverBudget } = data;
 
     // Validate required fields
     if (!stallId || !items || !items.length || !paymentMethod) {
@@ -30,9 +30,9 @@ async function createOrder(data) {
 
     let totalAmount = 0;
     const orderLines = [];
+    const stockDeductions = [];
 
     for (const item of items) {
-        // Find product in stall's products array
         const product = stall.products.find(p => p._id.toString() === item.productId);
         if (!product) return { success: false, reason: "product_not_found", productId: item.productId };
         if (!product.available) return { success: false, reason: "product_unavailable", productName: product.productName };
@@ -41,9 +41,8 @@ async function createOrder(data) {
         const subtotal = product.price * item.quantity;
         totalAmount += subtotal;
 
-        // Include nutrition data from the product
         const nutrition = product.nutrition || {};
-        
+
         orderLines.push({
             productId: product._id,
             productName: product.productName,
@@ -58,19 +57,51 @@ async function createOrder(data) {
             }
         });
 
-        product.stocks -= item.quantity;
+        // Don't mutate stock yet — wait until the budget check clears
+        stockDeductions.push({ product, quantity: item.quantity });
     }
 
+    // ── Budget cap check (before committing anything) ──────────────────
+    const now = new Date();
+    const activeCap = student.budgetCap.find(b =>
+        b.status === "active" &&
+        new Date(b.startDate) <= now &&
+        new Date(b.endDate) >= now
+    );
+
+    if (activeCap && totalAmount > activeCap.currentBudget && !confirmOverBudget) {
+        return {
+            success: false,
+            reason: "over_budget",
+            data: {
+                currentBudget: activeCap.currentBudget,
+                totalAmount
+            }
+        };
+    }
+
+    // ── Commit stock deductions ─────────────────────────────────────────
+    for (const { product, quantity } of stockDeductions) {
+        product.stocks -= quantity;
+    }
     await stall.save();
+
+    // ── Deduct from active budget cap (student array + Budget collection) ──
+    if (activeCap) {
+        activeCap.currentBudget -= totalAmount;
+        await student.save();
+        await models_1.BudgetModel.updateOne(
+            { _id: activeCap._id },
+            { $set: { currentBudget: activeCap.currentBudget } }
+        );
+    }
 
     // Generate a new ObjectId for the order
     const orderId = new mongoose_1.Types.ObjectId();
 
-    // Get the count of existing orders for this student to determine order number
     const existingOrdersCount = await models_1.OrderModel.countDocuments({ studentId });
     const orderNumber = existingOrdersCount + 1;
 
-    // Create the order with a proper ObjectId for paymentRecord
     const order = await models_1.OrderModel.create({
         _id: orderId,
         studentId,
@@ -80,7 +111,7 @@ async function createOrder(data) {
         totalAmount,
         orderStatus: "pending",
         paymentMethod,
-        orderNumber: orderNumber, // Add this field
+        orderNumber,
         paymentRecord: {
             orderId: orderId,
             totalAmount,
@@ -90,15 +121,20 @@ async function createOrder(data) {
         }
     });
 
-    // Populate the order before returning
     const populatedOrder = await models_1.OrderModel.findById(order._id)
         .populate("studentId", "firstName lastName email tuptId course section profilePictureUrl")
         .populate("stallId", "stallName stallPicture section");
 
-    // Budget cap check
+    // Budget cap check (existing email-notification feature, unrelated to the deduction above)
     await checkBudgetCapAndNotify(studentId, totalAmount);
 
-    return { success: true, data: { order: populatedOrder.toObject() } };
+    return {
+        success: true,
+        data: {
+            order: populatedOrder.toObject(),
+            currentBudget: activeCap ? activeCap.currentBudget : null
+        }
+    };
 }
 
 // ── BUDGET CAP CHECK ─────────────────────────────────────────────────────

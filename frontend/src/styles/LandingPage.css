@@ -192,6 +192,13 @@
 
 .lp-search-form { display: flex; flex-direction: column; gap: 16px; }
 
+.lp-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .lp-search-input-wrapper {
   display: flex;
   align-items: center;
@@ -200,7 +207,10 @@
   border: 2px solid rgba(0, 0, 0, 0.08);
   transition: border-color 0.15s;
   overflow: hidden;
+  flex: 1;
+  min-width: 220px;
 }
+
 .lp-search-input-wrapper:focus-within { border-color: #ff3131; }
 
 .search-icon { padding: 0 16px; color: #a6a6a6; font-size: 18px; }
@@ -221,41 +231,40 @@
   background: #ff3131;
   color: white;
   border: none;
+  border-radius: 12px;
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   transition: background 0.15s;
+  white-space: nowrap;
 }
 .lp-search-btn:hover { background: #cc0000; }
 
-.lp-filters {
+.lp-price-inputs {
   display: flex;
-  gap: 20px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.lp-filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
-
-.lp-filter-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #555;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.lp-filter-select {
-  padding: 10px 14px;
-  border: 2px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  font-size: 14px;
+  align-items: center;
+  gap: 8px;
   background: white;
-  font-family: 'Poppins', sans-serif;
-  cursor: pointer;
-  transition: border-color 0.15s;
+  border: 2px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 0 12px;
+  flex-shrink: 0;
 }
-.lp-filter-select:focus { border-color: #ff3131; outline: none; }
+
+.lp-price-input {
+  width: 70px;
+  padding: 12px 4px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+  background: transparent;
+}
+
+.lp-price-separator {
+  color: #a6a6a6;
+  font-weight: 700;
+}
 
 .lp-clear-filters {
   padding: 10px 20px;
@@ -268,6 +277,7 @@
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  margin-top: 12px;
 }
 .lp-clear-filters:hover { background: #fff2f2; border-color: #ff3131; }
 
@@ -397,8 +407,8 @@
   .lp-stall-section { padding: 40px 20px 48px; }
   .lp-search-section { padding: 32px 20px; }
 
-  .lp-filters { flex-direction: column; align-items: stretch; }
-  .lp-filter-group { min-width: 100%; }
+  .lp-search-row { flex-direction: column; align-items: stretch; }
+  .lp-price-inputs { justify-content: center; }
 
   .lp-bottom-row { grid-template-columns: 1fr; padding: 0 20px 48px; }
 }

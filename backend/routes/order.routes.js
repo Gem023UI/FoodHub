@@ -18,23 +18,18 @@ function firstParam(value) {
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
-    const { stallId, items, paymentMethod } = request.body;
+    const { stallId, items, paymentMethod, confirmOverBudget } = request.body;
     const studentId = request.userId;
 
     console.log("📦 Order request:", { 
         stallId, 
         itemsCount: items?.length, 
         paymentMethod,
-        studentId 
+        studentId,
+        confirmOverBudget: !!confirmOverBudget
     });
 
     if (!stallId || !items || !items.length || !paymentMethod) {
-        console.log("❌ Missing fields:", { 
-            hasStallId: !!stallId, 
-            hasItems: !!items, 
-            itemsLength: items?.length, 
-            hasPaymentMethod: !!paymentMethod
-        });
         response.status(400).json({ 
             message: "stallId, items, and paymentMethod are required." 
         });
@@ -45,12 +40,23 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
         studentId,
         stallId,
         items,
-        paymentMethod
+        paymentMethod,
+        confirmOverBudget: !!confirmOverBudget
     });
 
     console.log("📦 Order result success:", result.success);
 
     if (!result.success) {
+        if (result.reason === "over_budget") {
+            response.status(409).json({
+                message: "This order exceeds your current budget. Confirm to proceed anyway.",
+                currentBudget: result.data.currentBudget,
+                totalAmount: result.data.totalAmount,
+                requiresConfirmation: true
+            });
+            return;
+        }
+
         const messages = {
             stall_not_found: "Stall not found.",
             student_not_found: "Student not found.",
@@ -65,7 +71,7 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
         return;
     }
 
-    response.status(201).json({ order: result.data.order });
+    response.status(201).json({ order: result.data.order, currentBudget: result.data.currentBudget });
 });
 
 // ── GET STUDENT ORDERS ──────────────────────────────────────────────────

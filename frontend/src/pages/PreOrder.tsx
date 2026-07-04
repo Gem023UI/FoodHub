@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { createOrder } from "../services/order.service";
+import { createOrder, OverBudgetError } from "../services/order.service";
+import { getStudentBudgetCaps } from "../services/budget.service";
 import "../styles/Preorder.css";
 
 interface PreorderItem {
@@ -52,6 +53,10 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
   const [orderId, setOrderId] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
 
+  const [currentBudget, setCurrentBudget] = useState<number | null>(null);
+  const [showOverBudgetConfirm, setShowOverBudgetConfirm] = useState(false);
+  const [pendingOverBudgetInfo, setPendingOverBudgetInfo] = useState<{ currentBudget: number; totalAmount: number } | null>(null);
+
   useEffect(() => {
     if (preorderData) {
       setItems(preorderData.items);
@@ -79,50 +84,55 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     }
   }, [error]);
 
+  useEffect(() => {
+    async function loadCurrentBudget() {
+      try {
+        const caps = await getStudentBudgetCaps(token);
+        const now = new Date();
+        const active = caps.find(c =>
+          c.status === "active" &&
+          new Date(c.startDate) <= now &&
+          new Date(c.endDate) >= now
+        );
+        setCurrentBudget(active ? active.currentBudget : null);
+      } catch (err) {
+        console.error("Error loading current budget:", err);
+      }
+    }
+    loadCurrentBudget();
+  }, [token]);
+
   const methodToDisplay: Record<string, string> = {
     "cash": "Cash",
     "gcash": "GCash",
     "paymaya": "Maya"
   };
 
-  async function handlePlaceOrder(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitOrder(confirmOverBudget: boolean) {
     setIsLoading(true);
     setError(null);
 
-    if (!stallId) {
-      setError("No stall selected. Please go back and try again.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (items.length === 0) {
-      setError("No items in your order.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      console.log("📦 Order payload:", { 
-        stallId, 
-        itemsCount: items.length, 
-        paymentMethod
-      });
-
       const orderInput = {
         stallId,
         items: items.map(item => ({
           productId: item.productId,
           quantity: item.quantity
         })),
-        paymentMethod: paymentMethod
+        paymentMethod,
+        confirmOverBudget
       };
 
       const result = await createOrder(token, orderInput);
-      
+
       setOrderId(result.order._id);
       setOrderPlaced(true);
       setSuccess("Order placed successfully!");
+      setShowOverBudgetConfirm(false);
+      setPendingOverBudgetInfo(null);
+      if (typeof result.currentBudget === "number") {
+        setCurrentBudget(result.currentBudget);
+      }
 
       localStorage.removeItem("cart");
 
@@ -130,11 +140,36 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
         setPaymentUrl("https://checkout.paymongo.com/checkout/session");
       }
     } catch (err) {
-      console.error("❌ Order error:", err);
-      setError(err instanceof Error ? err.message : "Failed to place order");
+      if (err instanceof OverBudgetError) {
+        setPendingOverBudgetInfo({ currentBudget: err.currentBudget, totalAmount: err.totalAmount });
+        setShowOverBudgetConfirm(true);
+      } else {
+        console.error("❌ Order error:", err);
+        setError(err instanceof Error ? err.message : "Failed to place order");
+      }
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handlePlaceOrder(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!stallId) {
+      setError("No stall selected. Please go back and try again.");
+      return;
+    }
+
+    if (items.length === 0) {
+      setError("No items in your order.");
+      return;
+    }
+
+    await submitOrder(false);
+  }
+
+  async function handleConfirmOverBudget() {
+    await submitOrder(true);
   }
 
   if (!preorderData) {
@@ -269,6 +304,15 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
           <form className="checkout-form" onSubmit={handlePlaceOrder}>
             <h3>Payment Details</h3>
 
+            {currentBudget !== null && (
+              <div className="current-budget-display">
+                <span>Current Budget:</span>
+                <span className={currentBudget < 0 ? "current-budget-negative" : "current-budget-value"}>
+                  ₱{currentBudget.toFixed(2)}
+                </span>
+              </div>
+            )}
+
             <div className="form-group">
               <label>Payment Method</label>
               <div className="payment-methods">
@@ -321,6 +365,27 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
           </form>
         </div>
       </div>
+
+      {showOverBudgetConfirm && pendingOverBudgetInfo && (
+        <div className="preorder-modal-overlay" onClick={() => !isLoading && setShowOverBudgetConfirm(false)}>
+          <div className="preorder-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>You've Reached Your Budget Limit</h3>
+            <p>
+              This order totals ₱{pendingOverBudgetInfo.totalAmount.toFixed(2)}, which exceeds your remaining
+              budget of ₱{pendingOverBudgetInfo.currentBudget.toFixed(2)}. Placing this order will put your
+              budget into the negative. Are you sure you want to continue?
+            </p>
+            <div className="preorder-modal-actions">
+              <button className="btn-secondary" onClick={() => setShowOverBudgetConfirm(false)} disabled={isLoading}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleConfirmOverBudget} disabled={isLoading}>
+                {isLoading ? "Processing..." : "Yes, Place Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer onNavigate={onNavigate} />
     </div>
