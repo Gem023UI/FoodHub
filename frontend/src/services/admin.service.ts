@@ -106,6 +106,23 @@ export async function deleteAdminStall(token: string, stallId: string) {
 }
 
 // Vendor roster (approve/deactivate a vendor within a stall)
+export interface AdminCreateVendorInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  contactNumber?: string;
+  position: "Cook" | "Manager" | "Financier";
+  stallId: string;
+}
+
+export async function createAdminVendor(token: string, input: AdminCreateVendorInput) {
+  return request<{ vendor: any }>("/users/vendors", {
+    method: "POST",
+    body: JSON.stringify(input)
+  }, token);
+}
+
 export async function updateStallVendor(token: string, stallId: string, vendorAuthId: string, input: Partial<AdminStallVendor>) {
   return request<{ vendor: AdminStallVendor }>(`/stalls/${stallId}/vendors/${vendorAuthId}`, {
     method: "PATCH",

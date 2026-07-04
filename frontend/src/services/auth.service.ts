@@ -58,6 +58,15 @@ export async function loginUser(email: string, password: string): Promise<LoginR
   return response.json();
 }
 
+export async function logoutUser(token: string): Promise<{ message: string }> {
+  const response = await fetch(`${apiBaseUrl}/auth/logout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Logout failed");
+  return response.json();
+}
+
 export async function verifyEmail(email: string, code: string): Promise<{ message: string }> {
   const response = await fetch(`${apiBaseUrl}/auth/verify-email`, {
     method: "POST",

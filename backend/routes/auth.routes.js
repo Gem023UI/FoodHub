@@ -5,6 +5,7 @@ exports.authRouter = void 0;
 
 const express_1 = require("express");
 const auth_controller_1 = require("../controllers/auth.controller");
+const auth_1 = require("../middleware/auth");
 
 const authRouter = (0, express_1.Router)();
 exports.authRouter = authRouter;
@@ -44,6 +45,17 @@ authRouter.post("/login", async (request, response) => {
             message: "Login failed. Please try again later.",
             error: process.env.NODE_ENV === "development" ? error.message : undefined
         });
+    }
+});
+
+// ── LOGOUT ──────────────────────────────────────────────────────────────
+authRouter.post("/logout", auth_1.authenticateRequest, async (request, response) => {
+    try {
+        await (0, auth_controller_1.logout)(request.userId, request.role);
+        response.json({ message: "Logged out successfully." });
+    } catch (error) {
+        console.error("❌ Logout error:", error);
+        response.status(500).json({ message: "Logout failed." });
     }
 });
 

@@ -5,6 +5,7 @@ exports.login = login;
 exports.registerStudent = registerStudent;
 exports.verifyEmail = verifyEmail;
 exports.resendVerification = resendVerification;
+exports.logout = logout;
 
 const models_1 = require("../models");
 const bcryptjs_1 = require("bcryptjs");
@@ -116,7 +117,8 @@ async function login(email, password) {
     // ── 7. Update last login for vendors ──────────────────────────────
     if (role === "vendor" && userModel === "Vendor") {
         await models_1.VendorModel.findByIdAndUpdate(user._id, {
-            lastLogin: new Date()
+            lastLogin: new Date(),
+            active: true
         });
     }
 
@@ -150,6 +152,14 @@ async function login(email, password) {
             }
         }
     };
+}
+
+// ── LOGOUT ──────────────────────────────────────────────────────────────
+async function logout(userId, role) {
+    if (role === "vendor") {
+        await models_1.VendorModel.findByIdAndUpdate(userId, { active: false });
+    }
+    return { success: true };
 }
 
 // ── REGISTER STUDENT ──────────────────────────────────────────────────

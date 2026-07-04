@@ -10,13 +10,13 @@ exports.updateVendor = updateVendor;
 exports.listAdmins = listAdmins;
 exports.createAdmin = createAdmin;
 exports.updateAdmin = updateAdmin;
+exports.createVendor = createVendor;
 
 const models_1 = require("../models");
 const ids_1 = require("../utils/ids");
 const bcryptjs_1 = require("bcryptjs");
 
 // ── Student helpers ──────────────────────────────────────────────────────────
-
 async function listStudents() {
     return models_1.StudentModel.find({ role: "student" })
         .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
@@ -43,7 +43,6 @@ async function updateStudent(studentId, updates, isAdmin = false) {
 }
 
 // ── Vendor helpers ───────────────────────────────────────────────────────────
-
 async function listVendors() {
     const stalls = await models_1.StallModel.find({}, "stallName vendors").lean();
     const vendors = [];
@@ -63,6 +62,51 @@ async function listVendors() {
         }
     }
     return vendors;
+}
+
+async function createVendor(data) {
+    if (!(0, ids_1.isValidObjectId)(data.stallId)) {
+        return { success: false, reason: "invalid_stall_id" };
+    }
+
+    const stall = await models_1.StallModel.findById(data.stallId);
+    if (!stall) {
+        return { success: false, reason: "stall_not_found" };
+    }
+
+    const existing = await models_1.VendorModel.findOne({ email: data.email });
+    if (existing) {
+        return { success: false, reason: "email_exists" };
+    }
+
+    const passwordHash = await bcryptjs_1.hash(data.password, 10);
+
+    const vendor = await models_1.VendorModel.create({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        passwordHash,
+        contactNumber: data.contactNumber ?? null,
+        position: data.position ?? "Cook",
+        stallId: stall._id,
+        stallName: stall.stallName,
+        status: "verified",
+        active: false,
+    });
+
+    stall.vendors.push({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phoneNumber: data.contactNumber ?? null,
+        vendorImage: null,
+        role: "vendor",
+        position: data.position ?? "Cook",
+        status: "verified",
+    });
+    await stall.save();
+
+    return { success: true, data: { vendor } };
 }
 
 async function updateVendor(vendorEmail, updates, isAdmin = false) {
@@ -88,7 +132,6 @@ async function updateVendor(vendorEmail, updates, isAdmin = false) {
 }
 
 // ── Admin helpers ────────────────────────────────────────────────────────────
-
 async function listAdmins() {
     return models_1.AdminModel.find({})
         .select("-passwordHash")
@@ -126,7 +169,6 @@ async function updateAdmin(adminId, updates) {
 }
 
 // ── Legacy helpers ───────────────────────────────────────────────────────────
-
 async function listUsers() {
     const students = await models_1.StudentModel.find({})
         .select("-passwordHash -emailVerificationCode -emailVerificationExpires")

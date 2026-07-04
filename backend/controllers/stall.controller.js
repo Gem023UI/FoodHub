@@ -23,7 +23,7 @@ exports.deleteReview = deleteReview;
 
 // Import models directly
 const stall_model_1 = require("../models/stall.model");
-const student_model_1 = require("../models/student.model");
+const vendor_model_1 = require("../models/vendor.model");
 const ids_1 = require("../utils/ids");
 
 // ── GET STALLS ──────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ async function getStallBySection(section) {
 // ── GET STALL BY VENDOR AUTH ID ──────────────────────────────────────
 async function getStallByVendorAuthId(vendorAuthId) {
     try {
-        const vendor = await student_model_1.StudentModel.findById(vendorAuthId).select("email").lean();
+        const vendor = await vendor_model_1.VendorModel.findById(vendorAuthId).select("email").lean();
         if (!vendor) return null;
         return stall_model_1.StallModel.findOne({ "vendors.email": vendor.email }).lean();
     } catch (error) {
@@ -65,7 +65,7 @@ async function getStallByVendorAuthId(vendorAuthId) {
 // ── GET VENDOR STALL ──────────────────────────────────────────────────
 async function getVendorStall(vendorAuthId) {
     try {
-        const vendor = await student_model_1.StudentModel.findById(vendorAuthId).select("email").lean();
+        const vendor = await vendor_model_1.VendorModel.findById(vendorAuthId).select("email").lean();
         if (!vendor) return null;
         return stall_model_1.StallModel.findOne({ "vendors.email": vendor.email }).lean();
     } catch (error) {
@@ -77,19 +77,19 @@ async function getVendorStall(vendorAuthId) {
 // ── GET VENDOR PROFILE ──────────────────────────────────────────────────
 async function getVendorProfile(vendorAuthId) {
     try {
-        const vendor = await student_model_1.StudentModel.findById(vendorAuthId)
-            .select("firstName lastName email profilePictureUrl contactNumber")
-            .lean();
+        const vendor = await vendor_model_1.VendorModel.findById(vendorAuthId)
+        .select("firstName lastName email profilePictureUrl contactNumber position status active")
+        .lean();
         if (!vendor) return null;
         
         const stall = await stall_model_1.StallModel.findOne({ "vendors.email": vendor.email }).lean();
         if (!stall) {
             return {
                 ...vendor,
-                stallId: null,
-                stallName: null,
-                position: null,
-                vendorStatus: null
+                stallId: stall._id,
+                stallName: stall.stallName,
+                position: vendorSub?.position ?? vendor.position,
+                vendorStatus: vendorSub?.status ?? vendor.status
             };
         }
         

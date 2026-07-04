@@ -34,23 +34,23 @@ usersRouter.get("/me", auth_1.authenticateRequest, async (request, response) => 
                 .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
                 .lean();
         } else if (role === "vendor") {
-            const student = await models_1.StudentModel.findById(userId)
-                .select("-passwordHash -emailVerificationCode -emailVerificationExpires")
+            const vendor = await models_1.VendorModel.findById(userId)
+                .select("-passwordHash")
                 .lean();
-            
-            if (student) {
-                const stall = await models_1.StallModel.findOne({ "vendors.email": student.email });
+
+            if (vendor) {
+                const stall = await models_1.StallModel.findOne({ "vendors.email": vendor.email });
                 if (stall) {
-                    const vendorSub = stall.vendors.find(v => v.email === student.email);
+                    const vendorSub = stall.vendors.find(v => v.email === vendor.email);
                     user = {
-                        ...student,
+                        ...vendor,
                         stallId: stall._id,
                         stallName: stall.stallName,
-                        position: vendorSub?.position,
-                        vendorStatus: vendorSub?.status
+                        position: vendorSub?.position ?? vendor.position,
+                        vendorStatus: vendorSub?.status ?? vendor.status
                     };
                 } else {
-                    user = student;
+                    user = vendor;
                 }
             }
         } else if (role === "admin") {
@@ -223,8 +223,25 @@ usersRouter.patch("/admins/:id", auth_1.authenticateRequest, (0, auth_1.authoriz
     }
 });
 
+usersRouter.post("/vendors", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+    try {
+        const result = await (0, user_controller_1.createVendor)(request.body);
+        if (!result.success) {
+            const messages = {
+                invalid_stall_id: "Invalid stall ID.",
+                stall_not_found: "Stall not found.",
+                email_exists: "Email already registered."
+            };
+            return response.status(400).json({ message: messages[result.reason] || "Failed to create vendor." });
+        }
+        response.status(201).json({ vendor: result.data.vendor });
+    } catch (error) {
+        console.error("Error creating vendor:", error);
+        response.status(500).json({ message: "Failed to create vendor." });
+    }
+});
+
 // ─── PROFILE UPLOAD ROUTES ──────────────────────────────────────────────
-// Import the upload functions
 const { 
     createStudentProfileUpload, 
     createVendorProfileUpload,

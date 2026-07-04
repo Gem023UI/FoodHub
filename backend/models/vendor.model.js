@@ -76,6 +76,10 @@ const vendorSchema = new mongoose_1.Schema(
       type: Date,
       default: null,
     },
+    active: {
+      type: Boolean,
+      default: false,
+    },
   },
   { 
     timestamps: true, 
