@@ -11,7 +11,8 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       }
-    }
+    },
+    allowedHosts: true
   },
   assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.hdr'],  // ADD THIS LINE
   build: {

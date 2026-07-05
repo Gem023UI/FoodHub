@@ -7,7 +7,7 @@ const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const order_controller_1 = require("../controllers/order.controller");
 const stall_controller_1 = require("../controllers/stall.controller");
-const models_1 = require("../models"); // ADD THIS IMPORT
+const models_1 = require("../models");
 
 const orderRouter = (0, express_1.Router)();
 exports.orderRouter = orderRouter;
@@ -18,20 +18,28 @@ function firstParam(value) {
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
-    const { stallId, items, paymentMethod, confirmOverBudget } = request.body;
+    const { stallId, items, paymentMethod, confirmOverBudget, pickupTime, referenceNumber, proofOfPaymentUrl } = request.body;
     const studentId = request.userId;
 
     console.log("📦 Order request:", { 
         stallId, 
         itemsCount: items?.length, 
         paymentMethod,
+        pickupTime,
         studentId,
         confirmOverBudget: !!confirmOverBudget
     });
 
-    if (!stallId || !items || !items.length || !paymentMethod) {
+    if (!stallId || !items || !items.length || !paymentMethod || !pickupTime) {
         response.status(400).json({ 
-            message: "stallId, items, and paymentMethod are required." 
+            message: "stallId, items, paymentMethod, and pickupTime are required." 
+        });
+        return;
+    }
+
+    if ((paymentMethod === "gcash" || paymentMethod === "paymaya") && (!referenceNumber || !proofOfPaymentUrl)) {
+        response.status(400).json({
+            message: "Reference number and proof of payment are required for GCash/Maya payments."
         });
         return;
     }
@@ -41,6 +49,9 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
         stallId,
         items,
         paymentMethod,
+        pickupTime,
+        referenceNumber,
+        proofOfPaymentUrl,
         confirmOverBudget: !!confirmOverBudget
     });
 
@@ -63,7 +74,8 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
             product_not_found: "Product not found.",
             product_unavailable: "Product is unavailable.",
             insufficient_stock: "Insufficient stock for product.",
-            missing_required_fields: "Missing required fields."
+            missing_required_fields: "Missing required fields.",
+            missing_payment_proof: "Reference number and proof of payment are required."
         };
         response.status(400).json({ 
             message: messages[result.reason] || "Failed to create order." 
@@ -93,8 +105,6 @@ orderRouter.get("/student/range", auth_1.authenticateRequest, async (request, re
     const { startDate, endDate } = request.query;
     
     try {
-        console.log("📅 Order range request:", { studentId, startDate, endDate });
-        
         let query = { studentId };
         
         if (startDate || endDate) {
@@ -111,14 +121,11 @@ orderRouter.get("/student/range", auth_1.authenticateRequest, async (request, re
             }
         }
         
-        console.log("📅 Query:", JSON.stringify(query));
-        
         const orders = await models_1.OrderModel.find(query)
             .populate("stallId", "stallName stallPicture section")
             .sort({ createdAt: -1 })
             .lean();
         
-        console.log(`📅 Found ${orders.length} orders`);
         response.json({ orders });
     } catch (error) {
         console.error("Error fetching student orders with date range:", error);
@@ -134,7 +141,6 @@ orderRouter.get("/stall/:stallId", auth_1.authenticateRequest, async (request, r
     const stallId = firstParam(request.params.stallId);
     
     try {
-        const isAdmin = request.role === "admin";
         const isVendor = request.role === "vendor";
         
         if (isVendor) {
@@ -187,10 +193,10 @@ orderRouter.get("/:orderId", auth_1.authenticateRequest, async (request, respons
 });
 
 // ── UPDATE ORDER STATUS (Vendor only) ──────────────────────────────────
-orderRouter.patch("/:orderId/status", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor", "admin"), async (request, response) => {
+orderRouter.patch("/:orderId/status", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor"), async (request, response) => {
     const orderId = firstParam(request.params.orderId);
     const { status } = request.body;
-    const userEmail = request.userEmail;
+    const vendorAuthId = request.userId;
 
     if (!status) {
         response.status(400).json({ message: "Status is required." });
@@ -205,21 +211,26 @@ orderRouter.patch("/:orderId/status", auth_1.authenticateRequest, (0, auth_1.aut
         return;
     }
 
-    const result = await (0, order_controller_1.updateOrderStatus)(orderId, status.toLowerCase(), userEmail);
-    
-    if (!result.success) {
-        const messages = {
-            order_not_found: "Order not found.",
-            unauthorized: "You are not authorized to update this order.",
-            order_finalized: "Cannot update a completed or cancelled order."
-        };
-        response.status(400).json({ 
-            message: messages[result.reason] || "Failed to update order status." 
-        });
-        return;
-    }
+    try {
+        const result = await (0, order_controller_1.updateOrderStatus)(orderId, status.toLowerCase(), vendorAuthId);
 
-    response.json({ order: result.data.order });
+        if (!result.success) {
+            const messages = {
+                order_not_found: "Order not found.",
+                unauthorized: "You are not authorized to update this order.",
+                order_finalized: "Cannot update a completed or cancelled order."
+            };
+            response.status(400).json({ 
+                message: messages[result.reason] || "Failed to update order status." 
+            });
+            return;
+        }
+
+        response.json({ order: result.data.order });
+    } catch (error) {
+        console.error("❌ Error updating order status:", error);
+        response.status(500).json({ message: "Failed to update order status." });
+    }
 });
 
 // ── UPDATE PAYMENT STATUS ──────────────────────────────────────────────────
@@ -261,15 +272,15 @@ orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (reques
             return response.status(403).json({ message: "Unauthorized to update payment." });
         }
 
-        if (paymentStatus === "paid" && !isStudent && !isAdmin) {
-            return response.status(403).json({ message: "Only students can mark payment as paid." });
+        if (paymentStatus === "paid" && !isStudent && !isVendor && !isAdmin) {
+            return response.status(403).json({ message: "Not authorized to mark payment as paid." });
         }
 
         if (paymentStatus === "refunded" && !isVendor && !isAdmin) {
             return response.status(403).json({ message: "Only vendors or admins can refund payments." });
         }
 
-        const result = await (0, order_controller_1.updatePaymentStatus)(orderId, paymentStatus.toLowerCase(), paymentData);
+        const result = await (0, order_controller_1.updateOrderStatus)(orderId, status.toLowerCase(), vendorAuthId);
         
         if (!result.success) {
             response.status(400).json({ 

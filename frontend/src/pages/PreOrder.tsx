@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { createOrder, OverBudgetError } from "../services/order.service";
+import { createOrder, uploadPaymentProof, OverBudgetError } from "../services/order.service";
 import { getStudentBudgetCaps } from "../services/budget.service";
 import "../styles/Preorder.css";
 
@@ -46,12 +46,17 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
   }>({ gcashNumber: null, mayaNumber: null });
   
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "gcash" | "paymaya">("cash");
+  const [pickupTime, setPickupTime] = useState<string>("");
+  const [referenceNumber, setReferenceNumber] = useState<string>("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+  const [uploadedProofUrl, setUploadedProofUrl] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
 
   const [currentBudget, setCurrentBudget] = useState<number | null>(null);
   const [showOverBudgetConfirm, setShowOverBudgetConfirm] = useState(false);
@@ -108,11 +113,43 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     "paymaya": "Maya"
   };
 
+  const requiresProof = paymentMethod === "gcash" || paymentMethod === "paymaya";
+
+  function handlePaymentMethodChange(method: "cash" | "gcash" | "paymaya") {
+    setPaymentMethod(method);
+    // Reset proof state when switching methods
+    setReferenceNumber("");
+    setProofFile(null);
+    setProofPreviewUrl(null);
+    setUploadedProofUrl(null);
+  }
+
+  function handleProofFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null;
+    setProofFile(file);
+    setUploadedProofUrl(null); // invalidate cached upload if file changes
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setProofPreviewUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setProofPreviewUrl(null);
+    }
+  }
+
   async function submitOrder(confirmOverBudget: boolean) {
     setIsLoading(true);
     setError(null);
 
     try {
+      let proofUrl = uploadedProofUrl;
+
+      if (requiresProof && proofFile && !proofUrl) {
+        proofUrl = await uploadPaymentProof(token, proofFile);
+        setUploadedProofUrl(proofUrl);
+      }
+
       const orderInput = {
         stallId,
         items: items.map(item => ({
@@ -120,7 +157,11 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
           quantity: item.quantity
         })),
         paymentMethod,
-        confirmOverBudget
+        pickupTime,
+        confirmOverBudget,
+        ...(requiresProof
+          ? { referenceNumber: referenceNumber.trim(), proofOfPaymentUrl: proofUrl || undefined }
+          : {})
       };
 
       const result = await createOrder(token, orderInput);
@@ -135,10 +176,6 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       }
 
       localStorage.removeItem("cart");
-
-      if (paymentMethod === "gcash" || paymentMethod === "paymaya") {
-        setPaymentUrl("https://checkout.paymongo.com/checkout/session");
-      }
     } catch (err) {
       if (err instanceof OverBudgetError) {
         setPendingOverBudgetInfo({ currentBudget: err.currentBudget, totalAmount: err.totalAmount });
@@ -163,6 +200,22 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
     if (items.length === 0) {
       setError("No items in your order.");
       return;
+    }
+
+    if (!pickupTime) {
+      setError("Please select a pickup time.");
+      return;
+    }
+
+    if (requiresProof) {
+      if (!referenceNumber.trim()) {
+        setError("Please enter the reference number from your payment transaction.");
+        return;
+      }
+      if (!proofFile) {
+        setError("Please upload a screenshot of your payment confirmation.");
+        return;
+      }
     }
 
     await submitOrder(false);
@@ -205,6 +258,10 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
               <span>{items.reduce((sum, i) => sum + i.quantity, 0)}</span>
             </div>
             <div className="order-detail-row">
+              <span>Pickup Time:</span>
+              <span>{pickupTime}</span>
+            </div>
+            <div className="order-detail-row">
               <span>Total:</span>
               <span>₱{totalAmount.toFixed(2)}</span>
             </div>
@@ -214,20 +271,12 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             </div>
           </div>
 
-          {(paymentMethod === "gcash" || paymentMethod === "paymaya") && paymentUrl && (
+          {requiresProof && (
             <div className="payment-section">
-              <h3>Complete Your Payment</h3>
-              <p>Click the button below to complete your payment via {methodToDisplay[paymentMethod]}.</p>
-              <a
-                href={paymentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="payment-btn"
-              >
-                Pay with {methodToDisplay[paymentMethod]}
-              </a>
-              <p className="payment-note">
-                After payment, you'll receive a confirmation email.
+              <h3>Payment Submitted</h3>
+              <p>
+                Your {methodToDisplay[paymentMethod]} payment (Ref: {referenceNumber}) is being
+                verified by the vendor. You'll see the payment status update in your order history.
               </p>
             </div>
           )}
@@ -314,6 +363,17 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
             )}
 
             <div className="form-group">
+              <label>Pickup Time</label>
+              <input
+                type="time"
+                value={pickupTime}
+                onChange={(e) => setPickupTime(e.target.value)}
+                required
+              />
+              <p className="field-help">Let the vendor know when you'll be available to pick up your order.</p>
+            </div>
+
+            <div className="form-group">
               <label>Payment Method</label>
               <div className="payment-methods">
                 {availablePaymentMethods.includes("cash") && (
@@ -323,7 +383,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
                       name="paymentMethod"
                       value="cash"
                       checked={paymentMethod === "cash"}
-                      onChange={(e) => setPaymentMethod(e.target.value as "cash")}
+                      onChange={() => handlePaymentMethodChange("cash")}
                     />
                     <span className="payment-label">💵 Cash</span>
                   </label>
@@ -335,7 +395,7 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
                       name="paymentMethod"
                       value="gcash"
                       checked={paymentMethod === "gcash"}
-                      onChange={(e) => setPaymentMethod(e.target.value as "gcash")}
+                      onChange={() => handlePaymentMethodChange("gcash")}
                     />
                     <span className="payment-label">📱 GCash</span>
                   </label>
@@ -347,13 +407,51 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
                       name="paymentMethod"
                       value="paymaya"
                       checked={paymentMethod === "paymaya"}
-                      onChange={(e) => setPaymentMethod(e.target.value as "paymaya")}
+                      onChange={() => handlePaymentMethodChange("paymaya")}
                     />
                     <span className="payment-label">📱 Maya</span>
                   </label>
                 )}
               </div>
             </div>
+
+            {requiresProof && (
+              <div className="payment-proof-section">
+                {paymentMethod === "gcash" && paymentDetails.gcashNumber && (
+                  <p className="field-help">Send payment to GCash number: <strong>{paymentDetails.gcashNumber}</strong></p>
+                )}
+                {paymentMethod === "paymaya" && paymentDetails.mayaNumber && (
+                  <p className="field-help">Send payment to Maya number: <strong>{paymentDetails.mayaNumber}</strong></p>
+                )}
+
+                <div className="form-group">
+                  <label>Reference Number</label>
+                  <input
+                    type="text"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder="e.g. 1234567890123"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Proof of Payment</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProofFileChange}
+                    required
+                  />
+                  <p className="field-help">Upload a screenshot of your payment confirmation.</p>
+                  {proofPreviewUrl && (
+                    <div className="proof-preview">
+                      <img src={proofPreviewUrl} alt="Proof of payment preview" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -392,5 +490,4 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
   );
 }
 
-// Add default export at the bottom
 export default Preorder;

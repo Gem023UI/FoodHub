@@ -15,11 +15,16 @@ const mongoose_1 = require("mongoose");
 
 // ── CREATE ORDER ──────────────────────────────────────────────────────────
 async function createOrder(data) {
-    const { studentId, stallId, items, paymentMethod, confirmOverBudget } = data;
+    const { studentId, stallId, items, paymentMethod, confirmOverBudget, pickupTime, referenceNumber, proofOfPaymentUrl } = data;
 
     // Validate required fields
-    if (!stallId || !items || !items.length || !paymentMethod) {
+    if (!stallId || !items || !items.length || !paymentMethod || !pickupTime) {
         return { success: false, reason: "missing_required_fields" };
+    }
+
+    // GCash / Maya require proof of payment + a reference number
+    if ((paymentMethod === "gcash" || paymentMethod === "paymaya") && (!referenceNumber || !proofOfPaymentUrl)) {
+        return { success: false, reason: "missing_payment_proof" };
     }
 
     const stall = await models_1.StallModel.findById(stallId);
@@ -57,7 +62,6 @@ async function createOrder(data) {
             }
         });
 
-        // Don't mutate stock yet — wait until the budget check clears
         stockDeductions.push({ product, quantity: item.quantity });
     }
 
@@ -96,7 +100,6 @@ async function createOrder(data) {
         );
     }
 
-    // Generate a new ObjectId for the order
     const orderId = new mongoose_1.Types.ObjectId();
 
     const existingOrdersCount = await models_1.OrderModel.countDocuments({ studentId });
@@ -111,12 +114,15 @@ async function createOrder(data) {
         totalAmount,
         orderStatus: "pending",
         paymentMethod,
+        pickupTime,
         orderNumber,
         paymentRecord: {
             orderId: orderId,
             totalAmount,
             paymentMethod,
             paymentReference: `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+            proofOfPaymentUrl: proofOfPaymentUrl || null,
+            referenceNumber: referenceNumber || null,
             status: "pending"
         }
     });
@@ -125,7 +131,6 @@ async function createOrder(data) {
         .populate("studentId", "firstName lastName email tuptId course section profilePictureUrl")
         .populate("stallId", "stallName stallPicture section");
 
-    // Budget cap check (existing email-notification feature, unrelated to the deduction above)
     await checkBudgetCapAndNotify(studentId, totalAmount);
 
     return {
@@ -142,7 +147,6 @@ async function checkBudgetCapAndNotify(studentId, orderTotal) {
     const student = await models_1.StudentModel.findById(studentId).select("email budgetCap");
     if (!student || !student.budgetCap || student.budgetCap.length === 0) return;
 
-    // Check active budget caps
     const now = new Date();
     for (const budget of student.budgetCap) {
         if (budget.status !== "active") continue;
@@ -190,7 +194,7 @@ async function checkBudgetCapAndNotify(studentId, orderTotal) {
 async function getStudentOrders(studentId) {
     return models_1.OrderModel.find({ studentId })
         .populate("stallId", "stallName stallPicture section")
-        .sort({ createdAt: 1 }) // Sort ascending (oldest first)
+        .sort({ createdAt: 1 })
         .lean();
 }
 
@@ -198,7 +202,7 @@ async function getStudentOrders(studentId) {
 async function getStallOrders(stallId) {
     return models_1.OrderModel.find({ stallId })
         .populate("studentId", "firstName lastName email tuptId course section")
-        .sort({ createdAt: 1 }) // Sort ascending (oldest first)
+        .sort({ createdAt: 1 })
         .lean();
 }
 
@@ -211,14 +215,17 @@ async function getOrderById(orderId) {
 }
 
 // ── UPDATE ORDER STATUS (Vendor only) ──────────────────────────────────
-async function updateOrderStatus(orderId, status, vendorEmail) {
+async function updateOrderStatus(orderId, status, vendorAuthId) {
     const order = await models_1.OrderModel.findById(orderId);
     if (!order) return { success: false, reason: "order_not_found" };
 
-    // Verify vendor belongs to this stall
+    // Resolve the vendor's email from their auth ID, then verify they belong to this stall
+    const vendor = await models_1.VendorModel.findById(vendorAuthId).select("email").lean();
+    if (!vendor) return { success: false, reason: "unauthorized" };
+
     const stall = await models_1.StallModel.findOne({
         _id: order.stallId,
-        "vendors.email": vendorEmail
+        "vendors.email": vendor.email
     });
     if (!stall) return { success: false, reason: "unauthorized" };
 
@@ -244,14 +251,8 @@ async function updatePaymentStatus(orderId, paymentStatus, paymentData) {
     };
 
     if (paymentData) {
-        updateData["paymentRecord.paymongoPaymentId"] = paymentData.paymentId;
-        updateData["paymentRecord.paymongoCheckoutId"] = paymentData.checkoutId;
-        updateData["paymentRecord.paymongoCheckoutUrl"] = paymentData.checkoutUrl;
-        updateData["paymentRecord.paymentReference"] = paymentData.paymentReference || `PAY-${Date.now()}`;
-    }
-
-    if (paymentStatus === "paid") {
-        updateData.orderStatus = "pending";
+        if (paymentData.proofOfPaymentUrl) updateData["paymentRecord.proofOfPaymentUrl"] = paymentData.proofOfPaymentUrl;
+        if (paymentData.referenceNumber) updateData["paymentRecord.referenceNumber"] = paymentData.referenceNumber;
     }
 
     const updated = await models_1.OrderModel.findByIdAndUpdate(orderId, {

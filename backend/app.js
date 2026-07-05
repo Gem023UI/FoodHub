@@ -25,8 +25,26 @@ function createApp() {
     const app = (0, express_1.default)();
     
     // ─── CORS ──────────────────────────────────────────────────────────────
+    const staticAllowedOrigins = process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+        : [];
+
     app.use((0, cors_1.default)({
-        origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
+        origin: (origin, callback) => {
+            // Allow non-browser requests (curl, server-to-server, Postman) with no origin header
+            if (!origin) return callback(null, true);
+
+            const isTrycloudflare = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin);
+            const isStaticallyAllowed = staticAllowedOrigins.includes(origin) || staticAllowedOrigins.includes('*');
+            const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+
+            if (isTrycloudflare || isStaticallyAllowed || isLocalhost) {
+                return callback(null, true);
+            }
+
+            console.warn(`🚫 CORS blocked origin: ${origin}`);
+            return callback(new Error('Not allowed by CORS'));
+        },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

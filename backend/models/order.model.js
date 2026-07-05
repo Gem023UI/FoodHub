@@ -14,7 +14,6 @@ const orderLineSchema = new mongoose_1.Schema({
   price: { type: Number, required: true, min: 0 },
   quantity: { type: Number, required: true, min: 1 },
   subtotal: { type: Number, required: true, min: 0 },
-  // Add nutrition fields from the product
   nutrition: {
     calories: { type: Number, default: null },
     protein: { type: Number, default: null },
@@ -38,9 +37,9 @@ const paymentRecordSchema = new mongoose_1.Schema({
     enum: ["cash", "gcash", "paymaya"]
   },
   paymentReference: { type: String, required: true, unique: true },
-  paymongoPaymentId: { type: String, default: null },
-  paymongoCheckoutId: { type: String, default: null },
-  paymongoCheckoutUrl: { type: String, default: null },
+  // ── Proof of payment (GCash / Maya) ─────────────────────────────────
+  proofOfPaymentUrl: { type: String, trim: true, default: null },
+  referenceNumber: { type: String, trim: true, default: null },
   status: {
     type: String,
     enum: ["pending", "paid", "refunded"],
@@ -76,6 +75,8 @@ const orderHistorySchema = new mongoose_1.Schema({
     required: true,
     enum: ["cash", "gcash", "paymaya"]
   },
+  // ── Pickup time chosen by the student at checkout (e.g. "14:30") ─────
+  pickupTime: { type: String, required: true, trim: true },
   paymentRecord: paymentRecordSchema
 }, { timestamps: true });
 
@@ -92,5 +93,4 @@ exports.OrderHistoryModel = OrderHistoryModel;
 const PaymentModel = (0, mongoose_1.model)("Payment", paymentRecordSchema);
 exports.PaymentModel = PaymentModel;
 
-// Export Order model as the main model for compatibility
 exports.OrderModel = OrderHistoryModel;

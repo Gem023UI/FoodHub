@@ -21,9 +21,8 @@ export interface PaymentRecord {
   totalAmount: number;
   paymentMethod: "cash" | "gcash" | "paymaya";
   paymentReference: string;
-  paymongoPaymentId: string | null;
-  paymongoCheckoutId: string | null;
-  paymongoCheckoutUrl: string | null;
+  proofOfPaymentUrl: string | null;
+  referenceNumber: string | null;
   status: "pending" | "paid" | "refunded";
   paidAt: string | null;
 }
@@ -51,6 +50,7 @@ export interface Order {
   totalAmount: number;
   orderStatus: "pending" | "preparing" | "ready" | "completed" | "cancelled";
   paymentMethod: "cash" | "gcash" | "paymaya";
+  pickupTime: string;
   paymentRecord: PaymentRecord;
   createdAt: string;
   updatedAt: string;
@@ -74,6 +74,9 @@ export async function createOrder(
     stallId: string;
     items: Array<{ productId: string; quantity: number }>;
     paymentMethod: "cash" | "gcash" | "paymaya";
+    pickupTime: string;
+    referenceNumber?: string;
+    proofOfPaymentUrl?: string;
     confirmOverBudget?: boolean;
   }
 ): Promise<{ order: Order; currentBudget: number | null }> {
@@ -102,6 +105,24 @@ export async function createOrder(
   return response.json();
 }
 
+// ── Upload proof of payment (GCash / Maya) ──────────────────────────────
+export async function uploadPaymentProof(token: string, file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("proof", file);
+
+  const response = await fetch(`${apiBaseUrl}/uploads/payment-proof`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(data.message ?? "Failed to upload payment proof");
+  }
+  const data = await response.json() as { url: string };
+  return data.url;
+}
+
 export async function getStudentOrders(token: string): Promise<Order[]> {
   const response = await fetch(`${apiBaseUrl}/orders/student`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -121,7 +142,6 @@ export async function getStudentOrdersWithDateRange(
   if (endDate) params.append("endDate", endDate);
   
   const url = `${apiBaseUrl}/orders/student/range${params.toString() ? `?${params.toString()}` : ''}`;
-  console.log("📅 Fetching orders with date range:", url);
   
   try {
     const response = await fetch(url, {
@@ -138,7 +158,6 @@ export async function getStudentOrdersWithDateRange(
     return data.orders;
   } catch (error) {
     console.error("❌ Error in getStudentOrdersWithDateRange:", error);
-    // Fallback to regular getStudentOrders
     return getStudentOrders(token);
   }
 }

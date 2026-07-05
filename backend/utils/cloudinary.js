@@ -135,6 +135,19 @@ function createReviewUpload() {
   return multer({ storage });
 }
 
+function createPaymentProofUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/payment-proofs",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 1200, crop: "limit" }],
+    },
+  });
+  return multer({ storage });
+}
+
 module.exports = { 
   initCloudinary, 
   uploadToCloudinary,
@@ -144,5 +157,6 @@ module.exports = {
   createVendorProfileUpload,
   createAdminProfileUpload,
   createReviewUpload,
-  createStallUpload
+  createStallUpload,
+  createPaymentProofUpload
 };
