@@ -70,6 +70,19 @@ function createProductUpload() {
   return multer({ storage });
 }
 
+function createStallUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/stalls",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 1000, crop: "limit" }],
+    },
+  });
+  return multer({ storage });
+}
+
 function createStudentProfileUpload() {
   initCloudinary();
   const storage = new CloudinaryStorage({
@@ -130,5 +143,6 @@ module.exports = {
   createStudentProfileUpload, 
   createVendorProfileUpload,
   createAdminProfileUpload,
-  createReviewUpload
+  createReviewUpload,
+  createStallUpload
 };

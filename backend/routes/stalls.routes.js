@@ -149,6 +149,16 @@ stallsRouter.post("/", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("a
         response.status(201).json({ stall });
     } catch (error) {
         console.error("Error creating stall:", error);
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyPattern || {})[0];
+            if (field === "section") {
+                return response.status(409).json({ message: `Section ${request.body.section} is already taken by another stall. Please choose a different section.` });
+            }
+            if (field === "stallName") {
+                return response.status(409).json({ message: `A stall named "${request.body.stallName}" already exists.` });
+            }
+            return response.status(409).json({ message: "Duplicate value error." });
+        }
         response.status(500).json({ message: "Failed to create stall." });
     }
 });
@@ -180,6 +190,39 @@ stallsRouter.delete("/:stallId", auth_1.authenticateRequest, (0, auth_1.authoriz
     } catch (error) {
         console.error("Error deleting stall:", error);
         response.status(500).json({ message: "Failed to delete stall." });
+    }
+});
+
+// ── UPDATE VENDOR STATUS (within a stall) ───────────────────────────────
+stallsRouter.patch("/:stallId/vendors/:vendorId/status", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+    const stallId = firstParam(request.params.stallId);
+    const vendorId = firstParam(request.params.vendorId);
+    const { status } = request.body;
+    const validStatuses = ["unverified", "verified", "deactivated", "suspended"];
+    if (!validStatuses.includes(status)) {
+        return response.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+    }
+    try {
+        const vendor = await (0, stall_controller_1.updateStallVendorStatus)(stallId, vendorId, status);
+        if (!vendor) return response.status(404).json({ message: "Vendor not found." });
+        response.json({ vendor });
+    } catch (error) {
+        console.error("Error updating vendor status:", error);
+        response.status(500).json({ message: "Failed to update vendor status." });
+    }
+});
+
+// ── REMOVE VENDOR FROM STALL ────────────────────────────────────────────
+stallsRouter.delete("/:stallId/vendors/:vendorId", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+    const stallId = firstParam(request.params.stallId);
+    const vendorId = firstParam(request.params.vendorId);
+    try {
+        const deleted = await (0, stall_controller_1.removeStallVendorRecord)(stallId, vendorId);
+        if (!deleted) return response.status(404).json({ message: "Vendor not found." });
+        response.status(204).send();
+    } catch (error) {
+        console.error("Error removing vendor:", error);
+        response.status(500).json({ message: "Failed to remove vendor." });
     }
 });
 

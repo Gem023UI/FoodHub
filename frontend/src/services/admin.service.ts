@@ -16,17 +16,26 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   return response.json() as Promise<T>;
 }
 
+function mapStall(raw: any): AdminStallItem {
+  return {
+    ...raw,
+    name: raw.name ?? raw.stallName,
+    description: raw.description ?? raw.stallDescription,
+    picture: raw.picture ?? raw.stallPicture ?? null,
+  };
+}
+
 // ── Stalls ────────────────────────────────────────────────────────────
 export interface AdminStallVendor {
   _id: string;
-  vendorAuthId: string;
   firstName: string;
   lastName: string;
   email: string;
   phoneNumber: string | null;
-  image: string | null;
-  roles: string[];
-  status: "unverified" | "pending" | "approved" | "deactivated" | "terminated";
+  vendorImage: string | null;
+  role: "student" | "admin" | "vendor";
+  position: "Cook" | "Manager" | "Financier";
+  status: "unverified" | "verified" | "deactivated" | "suspended";
 }
 
 export interface AdminStallItem {
@@ -79,12 +88,12 @@ export interface AdminCategoryItem {
 
 export async function fetchAdminStalls(token: string): Promise<AdminStallItem[]> {
   const result = await request<{ stalls: AdminStallItem[] }>("/stalls", {}, token);
-  return result.stalls;
+  return result.stalls.map(mapStall);
 }
 
 export async function fetchVendorStalls(token: string): Promise<AdminStallItem[]> {
   const result = await request<{ stalls: AdminStallItem[] }>("/stalls/vendor/my", {}, token);
-  return result.stalls;
+  return result.stalls.map(mapStall);
 }
 
 export async function createAdminStall(token: string, input: Partial<AdminStallItem>) {
@@ -123,15 +132,20 @@ export async function createAdminVendor(token: string, input: AdminCreateVendorI
   }, token);
 }
 
-export async function updateStallVendor(token: string, stallId: string, vendorAuthId: string, input: Partial<AdminStallVendor>) {
-  return request<{ vendor: AdminStallVendor }>(`/stalls/${stallId}/vendors/${vendorAuthId}`, {
+export async function updateVendorStatus(
+  token: string,
+  stallId: string,
+  vendorId: string,
+  status: "unverified" | "verified" | "deactivated" | "suspended"
+) {
+  return request<{ vendor: AdminStallVendor }>(`/stalls/${stallId}/vendors/${vendorId}/status`, {
     method: "PATCH",
-    body: JSON.stringify(input)
+    body: JSON.stringify({ status })
   }, token);
 }
 
-export async function removeStallVendor(token: string, stallId: string, vendorAuthId: string) {
-  return request<void>(`/stalls/${stallId}/vendors/${vendorAuthId}`, { method: "DELETE" }, token);
+export async function removeStallVendor(token: string, stallId: string, vendorId: string) {
+  return request<void>(`/stalls/${stallId}/vendors/${vendorId}`, { method: "DELETE" }, token);
 }
 
 export async function fetchAdminCategories(token: string): Promise<AdminCategoryItem[]> {

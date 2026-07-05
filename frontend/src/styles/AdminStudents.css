@@ -5,6 +5,11 @@
   background: #fafaf8;
 }
 
+.admin-students-page,
+.admin-students-page * {
+  font-family: 'Poppins', sans-serif;
+}
+
 .admin-students-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -17,9 +22,8 @@
   margin-bottom: 32px;
 }
 
-.admin-students-header h1 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 900;
+admin-students-header h1 {
+  font-weight: 800;
   font-size: 32px;
   color: #1a1a1a;
   margin: 0;
@@ -59,13 +63,50 @@
 }
 
 /* ── CHARTS SECTION ────────────────────────────────────────────────────── */
-.students-charts-section {
+
+.analytics-section-white {
   background: white;
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   margin-bottom: 32px;
 }
+
+.analytics-block {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 20px 0;
+}
+
+.analytics-block + .analytics-block {
+  border-top: 1px solid #f0f0f0;
+}
+
+.analytics-graph {
+  flex: 0 0 45%;
+  background: #fafaf8;
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid #f0f0f0;
+}
+
+.analytics-graph h3 {
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+
+.analytics-graph-inner {
+  position: relative;
+  height: 220px;
+}
+
+.analytics-text { flex: 1; }
+.analytics-text h4 { font-weight: 700; font-size: 16px; color: #1a1a1a; margin: 0 0 8px 0; }
+.analytics-text p { font-size: 14px; line-height: 1.6; color: #555; margin: 0; }
 
 .section-header {
   display: flex;
@@ -77,7 +118,6 @@
 }
 
 .section-header h2 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
   font-size: 20px;
   color: #1a1a1a;
@@ -115,28 +155,6 @@
   color: white;
 }
 
-.charts-grid-3 {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 24px;
-}
-
-.chart-container {
-  background: #fafaf8;
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid #f0f0f0;
-}
-
-.chart-container h3 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
-  font-size: 15px;
-  color: #333;
-  margin: 0 0 16px 0;
-  text-align: center;
-}
-
 .chart-total {
   text-align: center;
   font-size: 14px;
@@ -163,11 +181,50 @@
 }
 
 .table-section h2 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
   font-size: 18px;
   color: #1a1a1a;
   margin: 0 0 16px 0;
+}
+
+.table-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.table-section-header h2 { margin: 0; }
+
+.course-filter-select {
+  padding: 8px 14px;
+  border: 2px solid #e8e8e4;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.course-filter-select option {
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+.status-badge.clickable { cursor: pointer; }
+.status-badge.clickable:hover { opacity: 0.8; }
+
+.status-inline-select {
+  padding: 6px 10px;
+  border: 2px solid #ff3131;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  background: #ffffff;
 }
 
 .table-wrapper {
@@ -297,7 +354,7 @@
 }
 
 .empty-state h3 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-weight: 700;
   font-size: 20px;
   color: #1a1a1a;
@@ -356,7 +413,6 @@
 }
 
 .modal-header h2 {
-  font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
   font-size: 20px;
   color: #1a1a1a;

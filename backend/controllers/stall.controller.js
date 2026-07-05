@@ -20,6 +20,8 @@ exports.deleteProduct = deleteProduct;
 exports.addReview = addReview;
 exports.getReviewsForProduct = getReviewsForProduct;
 exports.deleteReview = deleteReview;
+exports.updateStallVendorStatus = updateStallVendorStatus;
+exports.removeStallVendorRecord = removeStallVendorRecord;
 
 // Import models directly
 const stall_model_1 = require("../models/stall.model");
@@ -129,6 +131,30 @@ async function getStallVendors(stallId) {
     if (!(0, ids_1.isValidObjectId)(stallId)) return null;
     const stall = await stall_model_1.StallModel.findById(stallId).select("vendors").lean();
     return stall ? stall.vendors : null;
+}
+
+// ── UPDATE VENDOR STATUS WITHIN A STALL ─────────────────────────────────
+async function updateStallVendorStatus(stallId, vendorId, status) {
+    if (!(0, ids_1.isValidObjectId)(stallId) || !(0, ids_1.isValidObjectId)(vendorId)) return null;
+    const stall = await stall_model_1.StallModel.findById(stallId);
+    if (!stall) return null;
+    const vendor = stall.vendors.id(vendorId);
+    if (!vendor) return null;
+    vendor.status = status;
+    await stall.save();
+    return vendor;
+}
+
+// ── REMOVE VENDOR FROM A STALL ──────────────────────────────────────────
+async function removeStallVendorRecord(stallId, vendorId) {
+    if (!(0, ids_1.isValidObjectId)(stallId) || !(0, ids_1.isValidObjectId)(vendorId)) return false;
+    const stall = await stall_model_1.StallModel.findById(stallId);
+    if (!stall) return false;
+    const vendor = stall.vendors.id(vendorId);
+    if (!vendor) return false;
+    vendor.deleteOne();
+    await stall.save();
+    return true;
 }
 
 // ── GET STALL PRODUCTS BY CATEGORY ────────────────────────────────────

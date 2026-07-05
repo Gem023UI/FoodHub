@@ -1,0 +1,129 @@
+.admin-orders-page,
+.admin-orders-page * {
+  font-family: 'Poppins', sans-serif;
+}
+
+.admin-orders-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fafaf8;
+}
+
+.admin-orders-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  flex: 1;
+  width: 100%;
+}
+
+.admin-orders-header { margin-bottom: 24px; }
+.admin-orders-header h1 { font-weight: 800; font-size: 28px; color: #1a1a1a; margin: 0; }
+.admin-orders-header .subtitle { font-size: 14px; color: #a6a6a6; margin: 4px 0 0 0; }
+
+.admin-loading {
+  display: flex; justify-content: center; align-items: center;
+  min-height: 400px; flex: 1;
+}
+
+.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-weight: 500; }
+.alert-error { background: #fff2f2; border: 1px solid #ffc9c9; color: #cc0000; }
+
+/* Quick insight */
+.quick-insight-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px 28px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-left: 6px solid #ff3131;
+}
+
+.quick-insight-icon { font-size: 40px; }
+.quick-insight-info { display: flex; flex-direction: column; }
+.quick-insight-value { font-size: 34px; font-weight: 800; color: #1a1a1a; line-height: 1.2; }
+.quick-insight-label { font-size: 14px; font-weight: 600; color: #555; }
+.quick-insight-sub { font-size: 13px; color: #a6a6a6; margin-top: 2px; }
+
+/* Analytics — matches Vendors/Students/Stalls pattern */
+.analytics-section-white {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 32px;
+}
+
+.section-header h2 { font-weight: 700; font-size: 20px; color: #1a1a1a; margin: 0 0 16px 0; }
+
+.analytics-block { display: flex; align-items: center; gap: 28px; padding: 20px 0; }
+.analytics-block + .analytics-block { border-top: 1px solid #f0f0f0; }
+
+.analytics-graph {
+  flex: 0 0 45%;
+  background: #fafaf8;
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid #f0f0f0;
+}
+.analytics-graph h3 { font-weight: 600; font-size: 15px; color: #333; margin: 0 0 12px 0; text-align: center; }
+.analytics-graph-inner { position: relative; height: 220px; }
+
+.analytics-text { flex: 1; }
+.analytics-text h4 { font-weight: 700; font-size: 16px; color: #1a1a1a; margin: 0 0 8px 0; }
+.analytics-text p { font-size: 14px; line-height: 1.6; color: #555; margin: 0; }
+
+.chart-placeholder {
+  display: flex; align-items: center; justify-content: center;
+  height: 200px; color: #999; font-size: 14px;
+}
+
+.records-label { font-weight: 700; font-size: 20px; color: #1a1a1a; margin: 0 0 16px 0; }
+
+.stall-orders-table-block {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.stall-table-title { font-weight: 700; font-size: 16px; color: #ff3131; margin: 0 0 12px 0; }
+
+.empty-state.small { padding: 20px; text-align: center; color: #a6a6a6; font-size: 14px; }
+
+.table-wrapper { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.admin-table th {
+  padding: 12px 16px; text-align: left; font-weight: 700; color: #555;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  background: #fafaf8; border-bottom: 2px solid #f0f0f0; white-space: nowrap;
+}
+.admin-table td { padding: 12px 16px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+.admin-table tbody tr:hover { background: #fafaf8; }
+
+.order-student { font-weight: 600; color: #1a1a1a; }
+.order-payment { text-transform: capitalize; }
+
+.order-status {
+  padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; display: inline-block;
+}
+.order-status.pending { background: #fff3cd; color: #856404; }
+.order-status.preparing { background: #cce5ff; color: #004085; }
+.order-status.ready { background: #d4edda; color: #155724; }
+.order-status.completed { background: #d1ecf1; color: #0c5460; }
+.order-status.cancelled { background: #f8d7da; color: #721c24; }
+
+@media (max-width: 900px) {
+  .analytics-block { flex-direction: column; align-items: stretch; }
+  .analytics-graph { flex: 1; }
+}
+
+@media (max-width: 768px) {
+  .admin-orders-container { padding: 20px 12px; }
+  .quick-insight-card { flex-direction: column; align-items: flex-start; }
+}

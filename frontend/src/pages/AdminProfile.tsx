@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Lanyard from "../components/Lanyard";
 import Loader from "../components/Loader";
+import bgImage from "../../images/background_UI.jpg";
 import "../styles/AdminProfile.css";
 
 interface AdminProfileData {
@@ -195,8 +196,8 @@ export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfi
       {error && <div className="alert alert-error ap-alert">{error}</div>}
       {successMsg && <div className="alert alert-success ap-alert">{successMsg}</div>}
 
-      <section className="ap-hero">
-        <div className="ap-hero-overlay" />
+      <section className="ap-hero" style={{ backgroundImage: `url(${bgImage})` }}>
+      <div className="ap-hero-overlay" />
         <div className="ap-hero-content">
           <div className="ap-hero-text">
             <p className="ap-hero-welcome">Welcome,</p>

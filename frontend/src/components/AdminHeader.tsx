@@ -24,6 +24,7 @@ export function AdminHeader({ onNavigate, token, onLogout, currentPage = "admin"
     { id: "admin-stalls", label: "Stalls", icon: "fa-store" },
     { id: "admin-vendors", label: "Vendors", icon: "fa-users" },
     { id: "admin-students", label: "Students", icon: "fa-graduation-cap" },
+    { id: "admin-orders", label: "Orders", icon: "fa-receipt" },
   ];
 
   return (

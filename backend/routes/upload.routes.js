@@ -5,13 +5,14 @@ exports.uploadRouter = void 0;
 
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const { createProductUpload, createReviewUpload } = require("../utils/cloudinary");
+const { createProductUpload, createReviewUpload, createStallUpload } = require("../utils/cloudinary");
 
 const uploadRouter = (0, express_1.Router)();
 exports.uploadRouter = uploadRouter;
 
 const productUpload = createProductUpload();
 const reviewUpload = createReviewUpload();
+const stallUpload = createStallUpload();
 
 // ─── UPLOAD PRODUCT IMAGE ───────────────────────────────────────────────
 uploadRouter.post("/product", auth_1.authenticateRequest, productUpload.single("product"), (request, response) => {
@@ -30,4 +31,13 @@ uploadRouter.post("/review", auth_1.authenticateRequest, reviewUpload.array("ima
     }
     const urls = request.files.map(file => file.path);
     response.json({ urls });
+});
+
+// ─── UPLOAD STALL IMAGE ──────────────────────────────────────────────────
+uploadRouter.post("/stall-image", auth_1.authenticateRequest, stallUpload.single("image"), (request, response) => {
+        if (!request.file) {
+        response.status(400).json({ message: "No file uploaded." });
+        return;
+    }
+    response.json({ url: request.file.path });
 });

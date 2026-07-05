@@ -963,3 +963,75 @@
   background: #f8d7da;
   color: #721c24;
 }
+
+.admin-stalls-page,
+.admin-stalls-page * {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Analytics — same white graph-left/text-right pattern as Vendors/Students */
+.analytics-section-white {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-bottom: 32px;
+}
+
+.analytics-block {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 20px 0;
+}
+
+.analytics-block + .analytics-block {
+  border-top: 1px solid #f0f0f0;
+}
+
+.analytics-graph {
+  flex: 0 0 45%;
+  background: #fafaf8;
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid #f0f0f0;
+}
+
+.analytics-graph h3 {
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+
+.analytics-graph-inner {
+  position: relative;
+  height: 220px;
+}
+
+.analytics-text { flex: 1; }
+.analytics-text h4 { font-weight: 700; font-size: 16px; color: #1a1a1a; margin: 0 0 8px 0; }
+.analytics-text p { font-size: 14px; line-height: 1.6; color: #555; margin: 0; }
+
+/* Stall cards section */
+.stall-cards-section {
+  margin-top: 8px;
+}
+
+.stall-cards-section h2 {
+  font-weight: 700;
+  font-size: 20px;
+  color: #1a1a1a;
+  margin: 0 0 16px 0;
+}
+
+.stall-cards-list {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .analytics-block { flex-direction: column; align-items: stretch; }
+  .analytics-graph { flex: 1; }
+}

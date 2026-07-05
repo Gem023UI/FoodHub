@@ -12,6 +12,7 @@ import { AdminVendors } from "./pages/AdminVendors";
 import { AdminStudents } from "./pages/AdminStudents";
 import { AdminProfile } from "./pages/AdminProfile";
 import { VendorStallPage } from "./pages/VendorStall";
+import { AdminOrders } from "./pages/AdminOrders";
 import { Stall } from "./pages/Stalls";
 import { VendorProducts } from "./pages/VendorProducts";
 import { VendorOrders } from "./pages/VendorOrders";
@@ -218,6 +219,8 @@ function App() {
         return <AdminStudents token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
       case "admin-profile":
         return <AdminProfile token={token || ""} userId={user?.id || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "admin-orders":
+        return <AdminOrders token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />
       
       // Vendor Pages
       case "vendor-stall":

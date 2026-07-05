@@ -1,0 +1,185 @@
+.admin-stall-card,
+.admin-stall-card * {
+  font-family: 'Poppins', sans-serif;
+}
+
+.admin-stall-card {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  margin-bottom: 20px;
+  background: #fff;
+  transition: box-shadow 0.2s;
+}
+
+.admin-stall-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.admin-stall-card-hero {
+  position: relative;
+  min-height: 260px;
+  background-size: cover;
+  background-position: center;
+  padding: 28px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  cursor: pointer;
+}
+
+.admin-stall-card-actions {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  gap: 10px;
+}
+
+.hero-btn {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.hero-btn.delete:hover { background: #ff3131; color: #fff; }
+.hero-btn.edit:hover { background: #ffde59; color: #1a1a1a; }
+
+.admin-stall-card-left {
+  color: #fff;
+  max-width: 60%;
+}
+
+.admin-stall-card-name {
+  font-weight: 800;
+  font-size: 34px;
+  margin: 0 0 8px 0;
+  line-height: 1.1;
+}
+
+.admin-stall-card-desc {
+  font-size: 14px;
+  margin: 0 0 4px 0;
+  opacity: 0.9;
+}
+
+.admin-stall-card-section {
+  font-size: 14px;
+  margin: 0 0 4px 0;
+  opacity: 0.9;
+}
+
+.admin-stall-card-hours {
+  font-size: 14px;
+  margin: 0 0 12px 0;
+  opacity: 0.9;
+}
+
+.admin-stall-card-hours i { margin-right: 6px; }
+
+.admin-stall-card-payment { margin-bottom: 12px; }
+.payment-label { font-size: 13px; margin: 0; opacity: 0.85; }
+.payment-values { font-size: 14px; font-weight: 600; margin: 2px 0 0 0; }
+
+.admin-stall-card-status {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-stall-card-status.open { background: #4ecdc4; color: #06403c; }
+.admin-stall-card-status.closed { background: #ff3131; color: #fff; }
+
+.admin-stall-card-right {
+  color: #fff;
+  text-align: right;
+}
+
+.revenue-label { font-size: 14px; margin: 0; opacity: 0.9; }
+.revenue-value { font-weight: 800; font-size: 38px; margin: 4px 0; }
+.revenue-sub { font-size: 13px; margin: 2px 0; opacity: 0.9; }
+
+.admin-stall-card-expand-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  opacity: 0.8;
+  font-size: 14px;
+}
+
+.admin-stall-card-details {
+  display: flex;
+  gap: 32px;
+  padding: 24px 36px;
+  background: #fafaf8;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.detail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-value {
+  font-weight: 800;
+  font-size: 28px;
+  color: #1a1a1a;
+}
+
+.detail-value.small { font-size: 16px; font-weight: 700; color: #ff3131; }
+
+.detail-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.category-block { flex: 1; min-width: 220px; }
+
+.category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.category-chip {
+  background: #fff;
+  border: 1px solid #e8e8e4;
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.category-empty { font-size: 13px; color: #a6a6a6; }
+
+@media (max-width: 768px) {
+  .admin-stall-card-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 24px;
+  }
+  .admin-stall-card-left { max-width: 100%; }
+  .admin-stall-card-right { text-align: left; }
+  .admin-stall-card-name { font-size: 26px; }
+  .revenue-value { font-size: 30px; }
+  .admin-stall-card-actions { position: static; margin-bottom: 12px; }
+  .admin-stall-card-details { flex-direction: column; gap: 20px; padding: 20px; }
+}

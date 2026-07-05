@@ -6,6 +6,8 @@ import {
   getStallSectionStatus,
   getStallDetailsWithRevenue
 } from "../services/report.service";
+import { AdminStallCard } from "../components/AdminStallCard";
+import { getStallOrders } from "../services/order.service";
 import "../styles/AdminStalls.css";
 
 // Chart.js imports
@@ -110,6 +112,15 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedStall, setSelectedStall] = useState<Stall | null>(null);
 
+  const [stallStats, setStallStats] = useState<Record<string, {
+    todayRevenue: number;
+    todayOrders: number;
+    vendorCount: number;
+    totalProducts: number;
+    productsByCategory: Record<string, number>;
+    bestSellingProduct: string | null;
+  }>>({});
+
   // Form states
   const [formData, setFormData] = useState<Partial<Stall>>({
     stallName: "",
@@ -137,6 +148,7 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
     status: "verified",
     password: ""
   });
+  
   const [showVendorForm, setShowVendorForm] = useState(false);
   const [editingVendorIndex, setEditingVendorIndex] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,11 +172,66 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
     try {
       const data = await getStalls();
       setStalls(data);
+      fetchStallStats(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load stalls");
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function fetchStallStats(stallList: Stall[]) {
+    const todayStr = new Date().toDateString();
+    const results: typeof stallStats = {};
+
+    await Promise.all(stallList.map(async (stall) => {
+      try {
+        const orders = await getStallOrders(token, stall._id);
+
+        let todayRevenue = 0;
+        let todayOrders = 0;
+        const productQty: Record<string, number> = {};
+
+        for (const order of orders) {
+          const isToday = new Date(order.createdAt).toDateString() === todayStr;
+          if (isToday) {
+            todayOrders++;
+            if (order.orderStatus === "completed") todayRevenue += order.totalAmount;
+          }
+          for (const line of order.orderLines) {
+            productQty[line.productName] = (productQty[line.productName] || 0) + line.quantity;
+          }
+        }
+
+        const bestSellingProduct = Object.entries(productQty).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+        const productsByCategory: Record<string, number> = {};
+        for (const product of stall.products || []) {
+          const cat = product.category || "Uncategorized";
+          productsByCategory[cat] = (productsByCategory[cat] || 0) + 1;
+        }
+
+        const vendorCount = (stall.vendors || []).filter((v: any) => v.status === "verified").length;
+
+        results[stall._id] = {
+          todayRevenue,
+          todayOrders,
+          vendorCount,
+          totalProducts: stall.products?.length || 0,
+          productsByCategory,
+          bestSellingProduct
+        };
+      } catch (err) {
+        console.error(`Error fetching stats for stall ${stall._id}:`, err);
+        results[stall._id] = {
+          todayRevenue: 0, todayOrders: 0, vendorCount: 0,
+          totalProducts: stall.products?.length || 0,
+          productsByCategory: {}, bestSellingProduct: null
+        };
+      }
+    }));
+
+    setStallStats(results);
   }
 
   async function fetchChartData() {
@@ -622,87 +689,74 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
         {successMsg && <div className="alert alert-success">{successMsg}</div>}
 
         {/* ─── CHARTS SECTION ─────────────────────────────────────────────── */}
-        <div className="stalls-charts-section">
+        <div className="analytics-section-white">
           <div className="section-header">
-            <h2>📊 Stall Analytics</h2>
+            <h2>Stall Analytics</h2>
           </div>
-          <div className="charts-grid-2">
-            {/* Pie: Section Status */}
-            <div className="chart-container">
+
+          <div className="analytics-block">
+            <div className="analytics-graph">
               <h3>Sections Overview</h3>
-              {sectionStatusData ? (
-                <Pie data={sectionStatusData} options={pieOptions} />
-              ) : (
-                <div className="chart-placeholder">Loading...</div>
-              )}
+              <div className="analytics-graph-inner">
+                {sectionStatusData ? (
+                  <Pie data={sectionStatusData} options={pieOptions} />
+                ) : (
+                  <div className="chart-placeholder">Loading...</div>
+                )}
+              </div>
               <p className="chart-total">
                 Total Sections: 12 | Occupied: {sectionStatusData?.datasets[0]?.data[0] || 0} | Empty: {sectionStatusData?.datasets[0]?.data[1] || 0}
               </p>
             </div>
+            <div className="analytics-text">
+              <h4>What this tells you</h4>
+              <p>This shows how many of your 12 marketplace sections are occupied versus empty — empty sections are opportunities to onboard new vendors.</p>
+            </div>
+          </div>
 
-            {/* Bar: Stall Revenue */}
-            <div className="chart-container">
+          <div className="analytics-block">
+            <div className="analytics-graph">
               <h3>Top Stalls by Revenue</h3>
-              {stallRevenueData ? (
-                <Bar data={stallRevenueData} options={barOptions} />
-              ) : (
-                <div className="chart-placeholder">Loading...</div>
-              )}
+              <div className="analytics-graph-inner">
+                {stallRevenueData ? (
+                  <Bar data={stallRevenueData} options={barOptions} />
+                ) : (
+                  <div className="chart-placeholder">Loading...</div>
+                )}
+              </div>
+            </div>
+            <div className="analytics-text">
+              <h4>What this tells you</h4>
+              <p>This compares completed-order revenue across stalls, helping identify top performers versus stalls that may need support.</p>
             </div>
           </div>
         </div>
 
         {/* ─── TABLE SECTION ───────────────────────────────────────────────── */}
-        <div className="table-section">
-          <h2>📋 Stall Records</h2>
+        <div className="stall-cards-section">
+          <h2>Stall Records</h2>
           {stalls.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">🏪</div>
               <h3>No Stalls Yet</h3>
               <p>Start by adding your first stall.</p>
-              <button className="btn-primary" onClick={openAddModal}>
-                Add Stall
-              </button>
+              <button className="btn-primary" onClick={openAddModal}>Add Stall</button>
             </div>
           ) : (
-            <div className="table-wrapper">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Section</th>
-                    <th>Status</th>
-                    <th>Vendors</th>
-                    <th>Products</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stalls.map((stall) => (
-                    <tr key={stall._id}>
-                      <td className="stall-name">{stall.stallName}</td>
-                      <td>Section {stall.section}</td>
-                      <td>
-                        <span className={`status-badge ${stall.status ? "active" : "inactive"}`}>
-                          {stall.status ? "Open" : "Closed"}
-                        </span>
-                      </td>
-                      <td>{stall.vendors?.length || 0}</td>
-                      <td>{stall.products?.length || 0}</td>
-                      <td>
-                        <div className="action-buttons">
-                          <button className="action-btn edit" onClick={() => openEditModal(stall)}>
-                            <i className="fas fa-edit"></i>
-                          </button>
-                          <button className="action-btn delete" onClick={() => openDeleteModal(stall)}>
-                            <i className="fas fa-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="stall-cards-list">
+              {stalls.map((stall) => (
+                <AdminStallCard
+                  key={stall._id}
+                  stall={stall}
+                  stats={stallStats[stall._id] || {
+                    todayRevenue: 0, todayOrders: 0, vendorCount: 0,
+                    totalProducts: stall.products?.length || 0,
+                    productsByCategory: {}, bestSellingProduct: null
+                  }}
+                  onEdit={() => openEditModal(stall)}
+                  onDelete={() => openDeleteModal(stall)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -1443,7 +1497,7 @@ export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
             <div className="delete-confirmation">
               <div className="delete-icon">⚠️</div>
               <p>Are you sure you want to delete <strong>"{selectedStall.stallName}"</strong>?</p>
-              <p className="delete-warning">This will also remove all associated products and vendors.</p>
+              <p className="delete-warning">This will also permanently remove all associated products, reviews, and vendors. Existing order history for this stall will be kept for record-keeping.</p>
               <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowDeleteModal(false)}>
                   Cancel
