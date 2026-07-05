@@ -1,75 +1,55 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
+import { ProductCard } from "../components/ProductCard";
+import { getVendorStall } from "../services/stall.service";
+import { getProductsByStall, createProduct, uploadProductImages, ProductCategory } from "../services/product.service";
+import { getReviewsByProduct } from "../services/review.service";
 import "../styles/VendorProducts.css";
-
-interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  photos: string[];
-  isAvailable: boolean;
-  isFeatured: boolean;
-  ingredients: string[];
-  allergens: string[];
-  nutrition: {
-    calories: number | null;
-    proteinGrams: number | null;
-    carbsGrams: number | null;
-    fatGrams: number | null;
-    sodiumMilligrams: number | null;
-  };
-  favoriteCount: number;
-  averageRating: number;
-  reviewCount: number;
-}
 
 interface VendorProductsProps {
   token: string;
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, data?: any) => void;
   onLogout?: () => void;
 }
 
-const PRODUCT_CATEGORIES = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
+const PRODUCT_CATEGORIES: ProductCategory[] = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
+const VENDOR_POSITIONS_UNUSED = null; // (kept for parity; not needed here)
+
+interface FlatReview {
+  _id: string;
+  reviewEmail: string;
+  reviewProfileUrl: string | null;
+  rating: number;
+  comment: string;
+  reviewImages: string[];
+  reviewDate: string;
+  productId: string;
+  productName: string;
+}
 
 export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsProps) {
-  const [products, setProducts] = useState<Product[]>([]);
   const [stall, setStall] = useState<any>(null);
-  const [stallId, setStallId] = useState<string | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [latestReviews, setLatestReviews] = useState<FlatReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  
-  // Modal states
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  
-  // Form states
-  const [formData, setFormData] = useState<Partial<Product>>({
-    name: "",
-    description: "",
+
+  // ── Add Product modal (same functionality as VendorStall) ──
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [productForm, setProductForm] = useState({
+    productName: "",
+    productDescription: "",
     price: 0,
-    category: "Rice Meal",
-    isAvailable: true,
-    isFeatured: false,
-    ingredients: [],
-    allergens: [],
-    nutrition: {
-      calories: null,
-      proteinGrams: null,
-      carbsGrams: null,
-      fatGrams: null,
-      sodiumMilligrams: null
-    },
-    photos: []
+    category: "Rice Meal" as ProductCategory,
+    stocks: 0,
+    available: true,
+    nutrition: { calories: null as number | null, protein: null as number | null, carbs: null as number | null, allergen: "" },
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [productPhotos, setProductPhotos] = useState<File[]>([]);
+  const [productPhotoPreviews, setProductPhotoPreviews] = useState<string[]>([]);
 
   useEffect(() => {
     fetchVendorData();
@@ -78,296 +58,120 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
   async function fetchVendorData() {
     setIsLoading(true);
     setError(null);
-
     try {
-      // Get vendor info
-      const vendorRes = await fetch("/api/users/me", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const stallData = await getVendorStall(token);
+      setStall(stallData);
 
-      if (!vendorRes.ok) {
-        throw new Error("Failed to fetch vendor data");
-      }
+      const productList = await getProductsByStall(stallData._id);
+      setProducts(productList);
 
-      const vendorData = await vendorRes.json();
-      
-      if (vendorData.stallId) {
-        setStallId(vendorData.stallId);
-        setStall(vendorData.stallData || { name: "My Stall" });
-        await fetchProducts(vendorData.stallId);
-      } else {
-        setError("You are not assigned to any stall yet.");
-      }
+      await loadLatestReviews(productList);
     } catch (err) {
+      console.error("Error fetching vendor products data:", err);
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function fetchProducts(stallId: string) {
+  async function loadLatestReviews(productList: any[]) {
     try {
-      const response = await fetch(`/api/stalls/${stallId}/products`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch products");
+      const allReviews: FlatReview[] = [];
+      for (const product of productList) {
+        try {
+          const reviews = await getReviewsByProduct(product._id);
+          reviews.forEach((r) => {
+            allReviews.push({
+              ...r,
+              productId: product._id,
+              productName: product.productName,
+            });
+          });
+        } catch (err) {
+          console.error(`Error loading reviews for product ${product._id}:`, err);
+        }
       }
-
-      const data = await response.json();
-      setProducts(data.products || []);
+      allReviews.sort((a, b) => new Date(b.reviewDate).getTime() - new Date(a.reviewDate).getTime());
+      setLatestReviews(allReviews.slice(0, 5));
     } catch (err) {
-      console.error("Error fetching products:", err);
-      setError("Failed to load products");
+      console.error("Error loading latest reviews:", err);
     }
   }
 
-  // ─── IMAGE UPLOAD ──────────────────────────────────────────────────────
-  async function uploadImage(file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append("product", file);
+  function handleProductPhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    const combined = [...productPhotos, ...files].slice(0, 5);
+    setProductPhotos(combined);
 
-    const response = await fetch("/api/uploads/product", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`
-      },
-      body: formData
+    const previews: string[] = [];
+    combined.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        previews.push(reader.result as string);
+        if (previews.length === combined.length) setProductPhotoPreviews([...previews]);
+      };
+      reader.readAsDataURL(file);
     });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || "Failed to upload image");
-    }
-
-    const data = await response.json();
-    return data.url;
   }
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size should be less than 5MB.");
-      return;
-    }
-
-    setSelectedImage(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  function removeProductPhoto(index: number) {
+    setProductPhotos((prev) => prev.filter((_, i) => i !== index));
+    setProductPhotoPreviews((prev) => prev.filter((_, i) => i !== index));
   }
 
-  const groupedProducts = () => {
-    const groups: Record<string, Product[]> = {};
-    PRODUCT_CATEGORIES.forEach(cat => {
-      groups[cat] = products.filter(p => p.category === cat);
+  function resetProductForm() {
+    setProductForm({
+      productName: "",
+      productDescription: "",
+      price: 0,
+      category: "Rice Meal",
+      stocks: 0,
+      available: true,
+      nutrition: { calories: null, protein: null, carbs: null, allergen: "" },
     });
-    const otherProducts = products.filter(p => !PRODUCT_CATEGORIES.includes(p.category || ""));
-    if (otherProducts.length > 0) {
-      groups["Other"] = otherProducts;
-    }
-    return groups;
-  };
+    setProductPhotos([]);
+    setProductPhotoPreviews([]);
+  }
 
-  // ─── ADD PRODUCT ──────────────────────────────────────────────────────
   async function handleAddProduct(e: React.FormEvent) {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
+    setSuccessMsg(null);
+    setIsSubmittingProduct(true);
 
     try {
-      if (!stallId) {
-        setError("No stall assigned");
-        setIsSubmitting(false);
-        return;
+      let productImages: string[] = [];
+      if (productPhotos.length > 0) {
+        productImages = await uploadProductImages(token, productPhotos);
       }
 
-      let imageUrl = "";
-      if (selectedImage) {
-        imageUrl = await uploadImage(selectedImage);
-      }
-
-      const productData = {
-        ...formData,
-        photos: imageUrl ? [imageUrl] : []
-      };
-
-      const response = await fetch(`/api/stalls/${stallId}/products`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(productData)
+      await createProduct(token, stall._id, {
+        ...productForm,
+        productImages,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Failed to add product");
-      }
+      setSuccessMsg("Product added successfully.");
+      resetProductForm();
+      setShowAddProductModal(false);
 
-      const data = await response.json();
-      setProducts(prev => [...prev, data.product]);
-      setShowAddModal(false);
-      resetForm();
-      setSuccessMsg("Product added successfully!");
-      setTimeout(() => setSuccessMsg(null), 3000);
+      const productList = await getProductsByStall(stall._id);
+      setProducts(productList);
+      await loadLatestReviews(productList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add product");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingProduct(false);
     }
   }
 
-  // ─── UPDATE PRODUCT ──────────────────────────────────────────────────
-  async function handleUpdateProduct(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      if (!selectedProduct) return;
-
-      let imageUrl = "";
-      if (selectedImage) {
-        imageUrl = await uploadImage(selectedImage);
-      }
-
-      const updateData = {
-        ...formData,
-        photos: imageUrl ? [imageUrl] : formData.photos
-      };
-
-      const response = await fetch(`/api/stalls/products/${selectedProduct._id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(updateData)
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Failed to update product");
-      }
-
-      const data = await response.json();
-      setProducts(prev => prev.map(p => 
-        p._id === selectedProduct._id ? data.product : p
-      ));
-      setShowEditModal(false);
-      resetForm();
-      setSuccessMsg("Product updated successfully!");
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update product");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  // ─── DELETE PRODUCT ──────────────────────────────────────────────────
-  async function handleDeleteProduct() {
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      if (!selectedProduct) return;
-
-      const response = await fetch(`/api/stalls/products/${selectedProduct._id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Failed to delete product");
-      }
-
-      setProducts(prev => prev.filter(p => p._id !== selectedProduct._id));
-      setShowDeleteModal(false);
-      setSelectedProduct(null);
-      setSuccessMsg("Product deleted successfully!");
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete product");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  function resetForm() {
-    setFormData({
-      name: "",
-      description: "",
-      price: 0,
-      category: "Rice Meal",
-      isAvailable: true,
-      isFeatured: false,
-      ingredients: [],
-      allergens: [],
-      nutrition: {
-        calories: null,
-        proteinGrams: null,
-        carbsGrams: null,
-        fatGrams: null,
-        sodiumMilligrams: null
-      },
-      photos: []
-    });
-    setSelectedProduct(null);
-    setSelectedImage(null);
-    setImagePreview(null);
-  }
-
-  function openEditModal(product: Product) {
-    setSelectedProduct(product);
-    setFormData({
-      name: product.name,
-      description: product.description || "",
-      price: product.price,
-      category: product.category || "Rice Meal",
-      isAvailable: product.isAvailable,
-      isFeatured: product.isFeatured,
-      ingredients: product.ingredients || [],
-      allergens: product.allergens || [],
-      nutrition: product.nutrition || {
-        calories: null,
-        proteinGrams: null,
-        carbsGrams: null,
-        fatGrams: null,
-        sodiumMilligrams: null
-      },
-      photos: product.photos || []
-    });
-    setImagePreview(product.photos?.[0] || null);
-    setShowEditModal(true);
-  }
-
-  function openDeleteModal(product: Product) {
-    setSelectedProduct(product);
-    setShowDeleteModal(true);
-  }
-
-  function openAddModal() {
-    resetForm();
-    setShowAddModal(true);
+  function productsByCategory(category: string) {
+    return products.filter((p) => p.category === category);
   }
 
   if (isLoading) {
     return (
       <div className="vendor-products-page">
-        <div className="vendor-products-loading">
-          <Loader />
-        </div>
+        <div className="vendor-products-loading"><Loader /></div>
         <Footer onNavigate={onNavigate} />
       </div>
     );
@@ -389,18 +193,15 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
     );
   }
 
-  const productGroups = groupedProducts();
-  const totalProducts = products.length;
-
   return (
     <div className="vendor-products-page">
       <div className="vendor-products-container">
         <div className="vendor-products-header">
           <div className="header-left">
-            <h1>Manage Products</h1>
-            <p className="subtitle">{stall?.name} • {totalProducts} products</p>
+            <h1>Orders</h1>
+            <p className="subtitle">{stall?.stallName} • {products.length} products</p>
           </div>
-          <button className="add-product-btn" onClick={openAddModal}>
+          <button className="add-product-btn" onClick={() => setShowAddProductModal(true)}>
             <i className="fas fa-plus"></i> Add Product
           </button>
         </div>
@@ -408,88 +209,77 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
         {error && <div className="alert alert-error">{error}</div>}
         {successMsg && <div className="alert alert-success">{successMsg}</div>}
 
-        {totalProducts === 0 ? (
+        {products.length === 0 ? (
           <div className="empty-products">
             <div className="empty-icon">🍽️</div>
             <h3>No Products Yet</h3>
             <p>Start adding your menu items to showcase them to customers.</p>
-            <button className="btn-primary" onClick={openAddModal}>
+            <button className="btn-primary" onClick={() => setShowAddProductModal(true)}>
               Add Your First Product
             </button>
           </div>
         ) : (
           <div className="products-sections">
-            {Object.entries(productGroups).map(([category, items]) => (
-              <div key={category} className="product-category-section">
-                <div className="category-header">
-                  <h2>{category}</h2>
-                  <span className="category-count">{items.length} items</span>
+            {PRODUCT_CATEGORIES.map((category) => {
+              const items = productsByCategory(category);
+              if (items.length === 0) return null;
+              return (
+                <div className="lp-category-block" key={category}>
+                  <h3 className="lp-category-title">{category}</h3>
+                  <div className="lp-category-rail">
+                    {items.map((product) => (
+                      <ProductCard
+                        key={product._id}
+                        product={product}
+                        token={token}
+                        onClick={() => onNavigate("product", product._id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="products-table-wrapper">
-                  <table className="products-table">
-                    <thead>
-                      <tr>
-                        <th>Image</th>
-                        <th>Name</th>
-                        <th>Price</th>
-                        <th>Status</th>
-                        <th>Featured</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((product) => (
-                        <tr key={product._id}>
-                          <td>
-                            <div className="product-image-cell">
-                              <img 
-                                src={product.photos?.[0] || "https://via.placeholder.com/50x50?text=No+Image"} 
-                                alt={product.name}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = "https://via.placeholder.com/50x50?text=No+Image";
-                                }}
-                              />
-                            </div>
-                          </td>
-                          <td className="product-name-cell">
-                            <div className="product-name">{product.name}</div>
-                            <div className="product-description">{product.description?.slice(0, 50) || ""}</div>
-                          </td>
-                          <td className="product-price-cell">₱{product.price.toFixed(2)}</td>
-                          <td>
-                            <span className={`status-badge ${product.isAvailable ? 'available' : 'unavailable'}`}>
-                              {product.isAvailable ? 'Available' : 'Unavailable'}
-                            </span>
-                          </td>
-                          <td>
-                            {product.isFeatured ? (
-                              <span className="featured-badge">⭐ Featured</span>
-                            ) : (
-                              <span className="not-featured-badge">—</span>
-                            )}
-                          </td>
-                          <td>
-                            <div className="action-buttons">
-                              <button 
-                                className="action-btn edit" 
-                                onClick={() => openEditModal(product)}
-                                title="Edit"
-                              >
-                                <i className="fas fa-edit"></i>
-                              </button>
-                              <button 
-                                className="action-btn delete" 
-                                onClick={() => openDeleteModal(product)}
-                                title="Delete"
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Latest 5 Reviews ── */}
+        <div className="reviews-header" style={{ marginTop: "36px" }}>
+          <h2>Latest Reviews</h2>
+        </div>
+        {latestReviews.length === 0 ? (
+          <p className="no-reviews">No reviews yet.</p>
+        ) : (
+          <div className="reviews-list">
+            {latestReviews.map((review) => (
+              <div key={review._id} className="review-item">
+                <div className="review-header">
+                  <div className="reviewer-info">
+                    <div className="reviewer-avatar">
+                      {review.reviewProfileUrl ? (
+                        <img src={review.reviewProfileUrl} alt="" />
+                      ) : (
+                        <span>{review.reviewEmail?.[0]?.toUpperCase() || "U"}</span>
+                      )}
+                    </div>
+                    <div className="reviewer-name">
+                      <span>{review.reviewEmail}</span>
+                      <div className="review-product-tag">on {review.productName}</div>
+                    </div>
+                  </div>
+                  <div className="review-rating">
+                    {"⭐".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
+                  </div>
+                </div>
+                {review.comment && <div className="review-comment">{review.comment}</div>}
+                {review.reviewImages && review.reviewImages.length > 0 && (
+                  <div className="review-photos">
+                    {review.reviewImages.map((photo, index) => (
+                      <img key={index} src={photo} alt={`Review ${index + 1}`} />
+                    ))}
+                  </div>
+                )}
+                <div className="review-date">
+                  {new Date(review.reviewDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                 </div>
               </div>
             ))}
@@ -497,458 +287,101 @@ export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsPr
         )}
       </div>
 
-      {/* ─── ADD PRODUCT MODAL ────────────────────────────────────────── */}
-      {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+      {/* ── ADD PRODUCT MODAL ── */}
+      {showAddProductModal && (
+        <div className="modal-overlay" onClick={() => setShowAddProductModal(false)}>
           <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add New Product</h2>
-              <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>
+              <h2>Add Product</h2>
+              <button className="modal-close" onClick={() => setShowAddProductModal(false)}>✕</button>
             </div>
             <form onSubmit={handleAddProduct} className="product-form">
               <div className="form-row">
                 <div className="form-group">
                   <label>Product Name *</label>
-                  <input
-                    type="text"
-                    value={formData.name || ""}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    placeholder="e.g., Chicken Inasal"
-                  />
+                  <input type="text" value={productForm.productName} onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })} required />
                 </div>
                 <div className="form-group">
                   <label>Price *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price || 0}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                    required
-                    placeholder="0.00"
-                  />
+                  <input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: parseFloat(e.target.value) || 0 })} required />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label>Category</label>
-                  <select
-                    value={formData.category || "Rice Meal"}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  >
-                    {PRODUCT_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
+                  <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value as ProductCategory })}>
+                    {PRODUCT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className="form-group checkbox-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.isAvailable !== false}
-                      onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
-                    />
-                    Available
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.isFeatured || false}
-                      onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                    />
-                    Featured
-                  </label>
+                <div className="form-group">
+                  <label>Stocks</label>
+                  <input type="number" min="0" value={productForm.stocks} onChange={(e) => setProductForm({ ...productForm, stocks: parseInt(e.target.value) || 0 })} />
                 </div>
               </div>
 
               <div className="form-group">
                 <label>Description</label>
-                <textarea
-                  value={formData.description || ""}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe your product..."
-                  rows={2}
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Ingredients (comma separated)</label>
-                  <input
-                    type="text"
-                    value={(formData.ingredients || []).join(", ")}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      ingredients: e.target.value.split(",").map(s => s.trim()).filter(Boolean) 
-                    })}
-                    placeholder="e.g., Chicken, Rice, Spices"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Allergens (comma separated)</label>
-                  <input
-                    type="text"
-                    value={(formData.allergens || []).join(", ")}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      allergens: e.target.value.split(",").map(s => s.trim()).filter(Boolean) 
-                    })}
-                    placeholder="e.g., Soy, Gluten"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Product Image</label>
-                <div className="image-upload-container">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="image-upload-input"
-                    id="add-image-upload"
-                  />
-                  <label htmlFor="add-image-upload" className="image-upload-label">
-                    <i className="fas fa-cloud-upload-alt"></i>
-                    <span>Choose Image</span>
-                  </label>
-                  {imagePreview && (
-                    <div className="image-preview">
-                      <img src={imagePreview} alt="Preview" />
-                      <button
-                        type="button"
-                        className="image-remove"
-                        onClick={() => {
-                          setSelectedImage(null);
-                          setImagePreview(null);
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <p className="field-hint">Supported formats: JPG, PNG, WebP. Max size: 5MB</p>
+                <textarea value={productForm.productDescription} onChange={(e) => setProductForm({ ...productForm, productDescription: e.target.value })} rows={2} />
               </div>
 
               <div className="form-section-title">Nutrition Facts</div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Calories</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.nutrition?.calories || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        calories: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                    placeholder="e.g., 450"
-                  />
+                  <input type="number" min="0" value={productForm.nutrition.calories ?? ""} onChange={(e) => setProductForm({ ...productForm, nutrition: { ...productForm.nutrition, calories: e.target.value ? parseFloat(e.target.value) : null } })} />
                 </div>
                 <div className="form-group">
                   <label>Protein (g)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formData.nutrition?.proteinGrams || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        proteinGrams: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                    placeholder="e.g., 35"
-                  />
+                  <input type="number" min="0" value={productForm.nutrition.protein ?? ""} onChange={(e) => setProductForm({ ...productForm, nutrition: { ...productForm.nutrition, protein: e.target.value ? parseFloat(e.target.value) : null } })} />
                 </div>
                 <div className="form-group">
                   <label>Carbs (g)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formData.nutrition?.carbsGrams || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        carbsGrams: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                    placeholder="e.g., 45"
-                  />
+                  <input type="number" min="0" value={productForm.nutrition.carbs ?? ""} onChange={(e) => setProductForm({ ...productForm, nutrition: { ...productForm.nutrition, carbs: e.target.value ? parseFloat(e.target.value) : null } })} />
                 </div>
                 <div className="form-group">
-                  <label>Fat (g)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formData.nutrition?.fatGrams || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        fatGrams: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                    placeholder="e.g., 18"
-                  />
-                </div>
-              </div>
-
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Adding..." : "Add Product"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─── EDIT PRODUCT MODAL ───────────────────────────────────────── */}
-      {showEditModal && selectedProduct && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Edit Product</h2>
-              <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleUpdateProduct} className="product-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Product Name *</label>
-                  <input
-                    type="text"
-                    value={formData.name || ""}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Price *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price || 0}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Category</label>
-                  <select
-                    value={formData.category || "Rice Meal"}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  >
-                    {PRODUCT_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group checkbox-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.isAvailable !== false}
-                      onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
-                    />
-                    Available
-                  </label>
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.isFeatured || false}
-                      onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                    />
-                    Featured
-                  </label>
+                  <label>Allergen</label>
+                  <input type="text" value={productForm.nutrition.allergen} onChange={(e) => setProductForm({ ...productForm, nutrition: { ...productForm.nutrition, allergen: e.target.value } })} />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  value={formData.description || ""}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={2}
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Ingredients (comma separated)</label>
-                  <input
-                    type="text"
-                    value={(formData.ingredients || []).join(", ")}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      ingredients: e.target.value.split(",").map(s => s.trim()).filter(Boolean) 
-                    })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Allergens (comma separated)</label>
-                  <input
-                    type="text"
-                    value={(formData.allergens || []).join(", ")}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      allergens: e.target.value.split(",").map(s => s.trim()).filter(Boolean) 
-                    })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Product Image</label>
+                <label>Product Photos (max 5)</label>
                 <div className="image-upload-container">
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={handleImageSelect}
+                    multiple
+                    onChange={handleProductPhotoSelect}
                     className="image-upload-input"
-                    id="edit-image-upload"
+                    id="vp-product-photos"
+                    disabled={productPhotos.length >= 5}
                   />
-                  <label htmlFor="edit-image-upload" className="image-upload-label">
+                  <label htmlFor="vp-product-photos" className="image-upload-label">
                     <i className="fas fa-cloud-upload-alt"></i>
-                    <span>Change Image</span>
+                    <span>{productPhotos.length >= 5 ? "Max 5 photos reached" : "Choose Photos"}</span>
                   </label>
-                  {imagePreview && (
-                    <div className="image-preview">
-                      <img src={imagePreview} alt="Preview" />
-                      <button
-                        type="button"
-                        className="image-remove"
-                        onClick={() => {
-                          setSelectedImage(null);
-                          setImagePreview(null);
-                        }}
-                      >
-                        ✕
-                      </button>
+                  {productPhotoPreviews.length > 0 && (
+                    <div className="photo-preview-grid">
+                      {productPhotoPreviews.map((src, index) => (
+                        <div key={index} className="image-preview">
+                          <img src={src} alt={`Preview ${index + 1}`} />
+                          <button type="button" className="image-remove" onClick={() => removeProductPhoto(index)}>✕</button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-                <p className="field-hint">Current image will be replaced when you upload a new one.</p>
-              </div>
-
-              <div className="form-section-title">Nutrition Facts</div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Calories</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.nutrition?.calories || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        calories: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Protein (g)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formData.nutrition?.proteinGrams || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        proteinGrams: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Carbs (g)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formData.nutrition?.carbsGrams || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        carbsGrams: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Fat (g)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={formData.nutrition?.fatGrams || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      nutrition: { 
-                        ...formData.nutrition, 
-                        fatGrams: e.target.value ? parseFloat(e.target.value) : null 
-                      } 
-                    })}
-                  />
-                </div>
+                <p className="field-hint">{productPhotos.length}/5 photos selected.</p>
               </div>
 
               <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowEditModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Save Changes"}
+                <button type="button" className="btn-secondary" onClick={() => setShowAddProductModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={isSubmittingProduct}>
+                  {isSubmittingProduct ? "Adding…" : "Add Product"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─── DELETE CONFIRMATION MODAL ────────────────────────────────── */}
-      {showDeleteModal && selectedProduct && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Delete Product</h2>
-              <button className="modal-close" onClick={() => setShowDeleteModal(false)}>✕</button>
-            </div>
-            <div className="delete-confirmation">
-              <div className="delete-icon">⚠️</div>
-              <p>Are you sure you want to delete <strong>"{selectedProduct.name}"</strong>?</p>
-              <p className="delete-warning">This action cannot be undone.</p>
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowDeleteModal(false)}>
-                  Cancel
-                </button>
-                <button type="button" className="btn-danger" onClick={handleDeleteProduct} disabled={isSubmitting}>
-                  {isSubmitting ? "Deleting..." : "Delete Product"}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

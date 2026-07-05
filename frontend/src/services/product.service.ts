@@ -123,3 +123,28 @@ export async function deleteProduct(token: string, productId: string): Promise<v
     throw new Error(data.message ?? "Failed to delete product");
   }
 }
+
+export async function uploadProductImage(token: string, file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("product", file);
+  const response = await fetch(`${apiBaseUrl}/uploads/product`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(data.message ?? "Failed to upload product image");
+  }
+  const data = await response.json() as { url: string };
+  return data.url;
+}
+
+export async function uploadProductImages(token: string, files: File[]): Promise<string[]> {
+  const limited = files.slice(0, 5);
+  const urls: string[] = [];
+  for (const file of limited) {
+    urls.push(await uploadProductImage(token, file));
+  }
+  return urls;
+}

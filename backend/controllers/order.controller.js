@@ -30,6 +30,37 @@ async function createOrder(data) {
     const stall = await models_1.StallModel.findById(stallId);
     if (!stall) return { success: false, reason: "stall_not_found" };
 
+    // ── Stall open/closed check ─────────────────────────────────────────
+    if (!stall.status) {
+        return { success: false, reason: "stall_closed" };
+    }
+
+    // ── Pickup time must be within stall's open hours ───────────────────
+    if (stall.openHours && stall.openHours.openTime && stall.openHours.closingTime) {
+        const toMinutes = (t) => {
+            const [h, m] = t.split(":").map(Number);
+            return h * 60 + m;
+        };
+        const pickupMinutes = toMinutes(pickupTime);
+        const openMinutes = toMinutes(stall.openHours.openTime);
+        const closeMinutes = toMinutes(stall.openHours.closingTime);
+
+        const withinHours = openMinutes <= closeMinutes
+            ? (pickupMinutes >= openMinutes && pickupMinutes <= closeMinutes)
+            : (pickupMinutes >= openMinutes || pickupMinutes <= closeMinutes); // handles overnight hours
+
+        if (!withinHours) {
+            return {
+                success: false,
+                reason: "pickup_time_outside_hours",
+                data: {
+                    openTime: stall.openHours.openTime,
+                    closingTime: stall.openHours.closingTime
+                }
+            };
+        }
+    }
+
     const student = await models_1.StudentModel.findById(studentId);
     if (!student) return { success: false, reason: "student_not_found" };
 

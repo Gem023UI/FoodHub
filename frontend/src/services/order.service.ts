@@ -67,6 +67,24 @@ export class OverBudgetError extends Error {
   }
 }
 
+export class PickupTimeOutsideHoursError extends Error {
+  openTime: string;
+  closingTime: string;
+  constructor(message: string, openTime: string, closingTime: string) {
+    super(message);
+    this.name = "PickupTimeOutsideHoursError";
+    this.openTime = openTime;
+    this.closingTime = closingTime;
+  }
+}
+
+export class StallClosedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StallClosedError";
+  }
+}
+
 // ── Order Functions ────────────────────────────────────────────────────
 export async function createOrder(
   token: string,
@@ -96,6 +114,20 @@ export async function createOrder(
       data.currentBudget,
       data.totalAmount
     );
+  }
+
+  if (response.status === 422) {
+    const data = await response.json() as { message?: string; openTime: string; closingTime: string };
+    throw new PickupTimeOutsideHoursError(
+      data.message ?? "Pickup time is outside the stall's open hours.",
+      data.openTime,
+      data.closingTime
+    );
+  }
+
+  if (response.status === 403) {
+    const data = await response.json() as { message?: string };
+    throw new StallClosedError(data.message ?? "This stall is currently closed.");
   }
 
   if (!response.ok) {

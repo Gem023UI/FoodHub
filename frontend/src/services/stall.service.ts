@@ -161,3 +161,44 @@ export async function deleteStall(token: string, stallId: string): Promise<void>
     throw new Error(data.message ?? "Failed to delete stall");
   }
 }
+
+export async function setStallStatus(token: string, stallId: string, status: boolean): Promise<{ stall: Stall }> {
+  const response = await fetch(`${apiBaseUrl}/stalls/${stallId}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ status })
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Failed to update stall status");
+  }
+  return response.json();
+}
+
+export interface AddVendorAccountInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  contactNumber?: string;
+  position: "Cook" | "Manager" | "Financier";
+}
+
+export async function addVendorAccount(token: string, stallId: string, input: AddVendorAccountInput): Promise<{ vendor: any }> {
+  const response = await fetch(`${apiBaseUrl}/stalls/${stallId}/vendor-account`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    const data = await response.json() as { message?: string };
+    throw new Error(data.message ?? "Failed to add vendor");
+  }
+  return response.json();
+}

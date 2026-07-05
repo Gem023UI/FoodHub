@@ -11,9 +11,10 @@ interface ProductProps {
   productId: string;
   onNavigate: (page: string, data?: any) => void;
   onLogout?: () => void;
+  role?: "student" | "vendor" | "admin" | null;
 }
 
-export function Product({ token, productId, onNavigate, onLogout }: ProductProps) {
+export function Product({ token, productId, onNavigate, onLogout, role }: ProductProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -316,22 +317,24 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
                 </div>
               </div>
 
-              <div className="action-buttons">
-                <button
-                  className="add-to-cart-btn"
-                  onClick={handleAddToCart}
-                  disabled={!product.available}
-                >
-                  <i className="fas fa-cart-plus"></i> Add to Cart
-                </button>
-                <button
-                  className="order-now-btn"
-                  onClick={handleOrderNow}
-                  disabled={!product.available}
-                >
-                  <i className="fas fa-bolt"></i> Order Now
-                </button>
-              </div>
+              {role === "student" && (
+                <div className="action-buttons">
+                  <button
+                    className="add-to-cart-btn"
+                    onClick={handleAddToCart}
+                    disabled={!product.available}
+                  >
+                    <i className="fas fa-cart-plus"></i> Add to Cart
+                  </button>
+                  <button
+                    className="order-now-btn"
+                    onClick={handleOrderNow}
+                    disabled={!product.available}
+                  >
+                    <i className="fas fa-bolt"></i> Order Now
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

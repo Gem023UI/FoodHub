@@ -196,7 +196,7 @@ function App() {
        case "stall":
          return <Stall stallId={pageData} token={token || undefined} onNavigate={navigateTo} onLogout={handleLogout} />;
       case "product":
-        return <Product token={token || undefined} productId={pageData} onNavigate={navigateTo} onLogout={handleLogout} />;
+        return <Product token={token || undefined} productId={pageData} onNavigate={navigateTo} onLogout={handleLogout} role={user?.role || null} />;
       case "cart":
         return <Cart token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
       case "preorder":

@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.setStallStatus = setStallStatus;
+exports.addVendorAccountToStall = addVendorAccountToStall;
 exports.getStalls = getStalls;
 exports.getStallById = getStallById;
 exports.getStallBySection = getStallBySection;
@@ -202,6 +204,54 @@ async function deleteStall(stallId) {
     if (!(0, ids_1.isValidObjectId)(stallId)) return false;
     const result = await stall_model_1.StallModel.findByIdAndDelete(stallId);
     return !!result;
+}
+
+// ── TOGGLE / SET STALL STATUS (open/closed) ──────────────────────────
+async function setStallStatus(stallId, status) {
+    if (!(0, ids_1.isValidObjectId)(stallId)) return null;
+    return stall_model_1.StallModel.findByIdAndUpdate(
+        stallId,
+        { $set: { status: !!status } },
+        { new: true }
+    ).lean();
+}
+
+// ── ADD VENDOR ACCOUNT TO A STALL (creates VendorModel + stall.vendors subdoc) ──
+async function addVendorAccountToStall(stallId, input) {
+    if (!(0, ids_1.isValidObjectId)(stallId)) return { success: false, reason: "invalid_stall_id" };
+
+    const stall = await stall_model_1.StallModel.findById(stallId);
+    if (!stall) return { success: false, reason: "stall_not_found" };
+
+    const existing = await vendor_model_1.VendorModel.findOne({ email: input.email.toLowerCase().trim() });
+    if (existing) return { success: false, reason: "email_taken" };
+
+    const bcrypt = require("bcryptjs");
+    const passwordHash = await bcrypt.hash(input.password, 10);
+
+    const vendorAccount = await vendor_model_1.VendorModel.create({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email.toLowerCase().trim(),
+        passwordHash,
+        contactNumber: input.contactNumber || null,
+        position: input.position,
+        stallId: stall._id,
+        stallName: stall.stallName,
+        status: "verified"
+    });
+
+    stall.vendors.push({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email.toLowerCase().trim(),
+        phoneNumber: input.contactNumber || null,
+        position: input.position,
+        status: "verified"
+    });
+    await stall.save();
+
+    return { success: true, data: { vendorAccount } };
 }
 
 // ── ADD PRODUCT ──────────────────────────────────────────────────────

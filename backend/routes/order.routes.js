@@ -68,6 +68,22 @@ orderRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
             return;
         }
 
+        if (result.reason === "stall_closed") {
+            response.status(403).json({
+                message: "This stall is currently closed."
+            });
+            return;
+        }
+
+        if (result.reason === "pickup_time_outside_hours") {
+            response.status(422).json({
+                message: `Pickup time must be between ${result.data.openTime} and ${result.data.closingTime}.`,
+                openTime: result.data.openTime,
+                closingTime: result.data.closingTime
+            });
+            return;
+        }
+
         const messages = {
             stall_not_found: "Stall not found.",
             student_not_found: "Student not found.",

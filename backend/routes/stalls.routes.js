@@ -226,6 +226,55 @@ stallsRouter.delete("/:stallId/vendors/:vendorId", auth_1.authenticateRequest, (
     }
 });
 
+// ── SET STALL STATUS (vendor who owns the stall, or admin) ─────────────
+stallsRouter.patch("/:stallId/status", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor", "admin"), async (request, response) => {
+    const stallId = firstParam(request.params.stallId);
+    const { status } = request.body;
+    if (typeof status !== "boolean") {
+        return response.status(400).json({ message: "status must be a boolean." });
+    }
+    try {
+        if (request.role === "vendor") {
+            const vendorStall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
+            if (!vendorStall || vendorStall._id.toString() !== stallId) {
+                return response.status(403).json({ message: "Unauthorized to update this stall." });
+            }
+        }
+        const stall = await (0, stall_controller_1.setStallStatus)(stallId, status);
+        if (!stall) return response.status(404).json({ message: "Stall not found." });
+        response.json({ stall });
+    } catch (error) {
+        console.error("Error updating stall status:", error);
+        response.status(500).json({ message: "Failed to update stall status." });
+    }
+});
+
+// ── ADD VENDOR ACCOUNT TO STALL (vendor adding a co-vendor, or admin) ──
+stallsRouter.post("/:stallId/vendor-account", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor", "admin"), async (request, response) => {
+    const stallId = firstParam(request.params.stallId);
+    try {
+        if (request.role === "vendor") {
+            const vendorStall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
+            if (!vendorStall || vendorStall._id.toString() !== stallId) {
+                return response.status(403).json({ message: "Unauthorized to add vendors to this stall." });
+            }
+        }
+        const result = await (0, stall_controller_1.addVendorAccountToStall)(stallId, request.body);
+        if (!result.success) {
+            const messages = {
+                invalid_stall_id: "Invalid stall ID.",
+                stall_not_found: "Stall not found.",
+                email_taken: "This email is already registered to a vendor."
+            };
+            return response.status(result.reason === "stall_not_found" ? 404 : 409).json({ message: messages[result.reason] || "Failed to add vendor." });
+        }
+        response.status(201).json({ vendor: result.data.vendorAccount });
+    } catch (error) {
+        console.error("Error adding vendor account:", error);
+        response.status(500).json({ message: "Failed to add vendor." });
+    }
+});
+
 // ── ADD PRODUCT TO STALL ──────────────────────────────────────────────
 stallsRouter.post("/:stallId/products", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin", "vendor"), async (request, response) => {
     const stallId = firstParam(request.params.stallId);

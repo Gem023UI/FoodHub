@@ -99,15 +99,19 @@ async function getProductsByCategory(category) {
 
 // ── CREATE PRODUCT ──────────────────────────────────────────────────────────
 async function createProduct(stallId, input) {
-    return (0, stall_controller_1.createProduct)(stallId, input);
+    return (0, stall_controller_1.addProduct)(stallId, input);
 }
 
 // ── UPDATE PRODUCT ──────────────────────────────────────────────────────────
 async function updateProduct(productId, updates) {
-    return (0, stall_controller_1.updateProduct)(productId, updates);
+    const stall = await models_1.StallModel.findOne({ "products._id": productId });
+    if (!stall) return null;
+    return (0, stall_controller_1.updateProduct)(stall._id.toString(), productId, updates);
 }
 
 // ── DELETE PRODUCT ──────────────────────────────────────────────────────────
 async function deleteProduct(productId) {
-    return (0, stall_controller_1.deleteProduct)(productId);
+    const stall = await models_1.StallModel.findOne({ "products._id": productId });
+    if (!stall) return false;
+    return (0, stall_controller_1.deleteProduct)(stall._id.toString(), productId);
 }

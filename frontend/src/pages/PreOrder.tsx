@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { createOrder, uploadPaymentProof, OverBudgetError } from "../services/order.service";
+import { createOrder, uploadPaymentProof, OverBudgetError, PickupTimeOutsideHoursError, StallClosedError } from "../services/order.service";
 import { getStudentBudgetCaps } from "../services/budget.service";
+import { getStallCard } from "../services/stall.service";
 import "../styles/Preorder.css";
 
 interface PreorderItem {
@@ -62,6 +63,11 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
   const [showOverBudgetConfirm, setShowOverBudgetConfirm] = useState(false);
   const [pendingOverBudgetInfo, setPendingOverBudgetInfo] = useState<{ currentBudget: number; totalAmount: number } | null>(null);
 
+  const [stallClosed, setStallClosed] = useState(false);
+  const [isCheckingStall, setIsCheckingStall] = useState(true);
+  const [showPickupTimeModal, setShowPickupTimeModal] = useState(false);
+  const [pickupTimeHours, setPickupTimeHours] = useState<{ openTime: string; closingTime: string } | null>(null);
+
   useEffect(() => {
     if (preorderData) {
       setItems(preorderData.items);
@@ -81,6 +87,27 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       }
     }
   }, [preorderData]);
+
+  useEffect(() => {
+    async function checkStallStatus() {
+      if (!preorderData?.stallId) {
+        setIsCheckingStall(false);
+        return;
+      }
+      setIsCheckingStall(true);
+      try {
+        const stallCard = await getStallCard(preorderData.stallId);
+        if (!stallCard.status) {
+          setStallClosed(true);
+        }
+      } catch (err) {
+        console.error("Error checking stall status:", err);
+      } finally {
+        setIsCheckingStall(false);
+      }
+    }
+    checkStallStatus();
+  }, [preorderData?.stallId]);
 
   useEffect(() => {
     if (error) {
@@ -180,6 +207,11 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
       if (err instanceof OverBudgetError) {
         setPendingOverBudgetInfo({ currentBudget: err.currentBudget, totalAmount: err.totalAmount });
         setShowOverBudgetConfirm(true);
+      } else if (err instanceof PickupTimeOutsideHoursError) {
+        setPickupTimeHours({ openTime: err.openTime, closingTime: err.closingTime });
+        setShowPickupTimeModal(true);
+      } else if (err instanceof StallClosedError) {
+        setStallClosed(true);
       } else {
         console.error("❌ Order error:", err);
         setError(err instanceof Error ? err.message : "Failed to place order");
@@ -223,6 +255,17 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
 
   async function handleConfirmOverBudget() {
     await submitOrder(true);
+  }
+
+  if (isCheckingStall) {
+    return (
+      <div className="preorder-page">
+        <div className="vendor-loading" style={{ display: "flex", justifyContent: "center", padding: "80px 0", flex: 1 }}>
+          <Loader />
+        </div>
+        <Footer onNavigate={onNavigate} />
+      </div>
+    );
   }
 
   if (!preorderData) {
@@ -479,6 +522,41 @@ export function Preorder({ token, onNavigate, onLogout, preorderData }: Preorder
               </button>
               <button className="btn-primary" onClick={handleConfirmOverBudget} disabled={isLoading}>
                 {isLoading ? "Processing..." : "Yes, Place Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {stallClosed && (
+        <div className="preorder-modal-overlay">
+          <div className="preorder-modal">
+            <h3>This Stall is Currently Closed</h3>
+            <p>
+              {stallName || "This stall"} is not accepting orders right now. Please check back
+              when the stall is open, or explore other available stalls.
+            </p>
+            <div className="preorder-modal-actions">
+              <button className="btn-primary" onClick={() => onNavigate("home")}>
+                Back to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPickupTimeModal && pickupTimeHours && (
+        <div className="preorder-modal-overlay" onClick={() => !isLoading && setShowPickupTimeModal(false)}>
+          <div className="preorder-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Pickup Time Outside Store Hours</h3>
+            <p>
+              This stall is only open from <strong>{pickupTimeHours.openTime}</strong> to{" "}
+              <strong>{pickupTimeHours.closingTime}</strong>. Please choose a pickup time within
+              these hours.
+            </p>
+            <div className="preorder-modal-actions">
+              <button className="btn-primary" onClick={() => setShowPickupTimeModal(false)}>
+                Adjust Pickup Time
               </button>
             </div>
           </div>
