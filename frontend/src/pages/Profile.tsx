@@ -17,6 +17,7 @@ import {
 } from "../services/budget.service";
 import { getNutritionAnalytics, type NutritionAnalytics } from "../services/report.service";
 import { getReviewsByProduct, createReview, uploadReviewImages, type ProductReview } from "../services/review.service";
+import backgroundImage from "../../images/profile background.png";
 import "../styles/Profile.css";
 
 interface ProfileProps {
@@ -610,7 +611,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
       {successMsg && <div className="alert alert-success profile-alert">{successMsg}</div>}
 
       {/* ══════════════════════════ SECTION 1 — Student Info ══════════════════════════ */}
-      <section className="pf-section pf-hero">
+      <section className="pf-section pf-hero" style={{ backgroundImage: `url(${backgroundImage})` }}>
         <div className="pf-hero-overlay" />
         <div className="pf-hero-content">
           <div className="pf-hero-text">
