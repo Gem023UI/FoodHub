@@ -7,6 +7,7 @@ const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const product_controller_1 = require("../controllers/product.controller");
 const stall_controller_1 = require("../controllers/stall.controller");
+const models_1 = require("../models");
 
 const productRouter = (0, express_1.Router)();
 exports.productRouter = productRouter;
