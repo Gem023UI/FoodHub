@@ -108,5 +108,4 @@ async function sendBudgetCapEmail(toEmail, { capAmount, period, orderTotal, peri
   }
 }
 
-module.exports.sendBudgetCapEmail = sendBudgetCapEmail;
-module.exports = { sendVerificationEmail };
+module.exports = { sendVerificationEmail, sendBudgetCapEmail };
