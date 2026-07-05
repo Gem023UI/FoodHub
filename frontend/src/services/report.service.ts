@@ -285,32 +285,24 @@ export async function getTrendInsights(token: string): Promise<any> {
 }
 
 export async function getNutritionAnalytics(
-  token: string, 
-  period: "weekly" | "monthly" | "custom",
-  startDate?: string, 
-  endDate?: string
+  token: string,
+  period: "daily" | "weekly" | "monthly"
 ): Promise<NutritionAnalytics> {
-  const params = new URLSearchParams();
-  params.append("period", period);
-  if (startDate) params.append("startDate", startDate);
-  if (endDate) params.append("endDate", endDate);
-  
+  const params = new URLSearchParams({ period });
   const url = `${apiBaseUrl}/reports/nutrition?${params.toString()}`;
-  console.log("🔬 Fetching nutrition from:", url);
-  
+
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` }
   });
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error("🔬 Nutrition API error:", errorText);
     throw new Error("Failed to fetch nutrition analytics");
   }
-  
+
   const data = await response.json();
-  console.log("🔬 Nutrition API response:", data);
-  
+
   return {
     labels: data.labels || [],
     protein: data.protein || [],

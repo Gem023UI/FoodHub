@@ -26,7 +26,7 @@ interface ProfileProps {
   onLogout?: () => void;
 }
 
-type ViewRange = "weekly" | "monthly" | "custom";
+type ViewRange = "daily" | "weekly" | "monthly";
 
 interface OrderLike {
   _id: string;
@@ -121,21 +121,17 @@ function LineChart({ labels, series, height = 220 }: { labels: string[]; series:
 
 // ── Range/period dropdown ──
 function RangeDropdown({
-  value, onChange, customStart, customEnd, onCustomChange,
-  options = ["weekly", "monthly", "custom"],
+  value, onChange, options = ["weekly", "monthly"],
 }: {
   value: ViewRange;
   onChange: (v: ViewRange) => void;
-  customStart: string;
-  customEnd: string;
-  onCustomChange: (start: string, end: string) => void;
   options?: ViewRange[];
 }) {
   const [open, setOpen] = useState(false);
   return (
     <span className="range-dropdown">
       <button type="button" className="range-dropdown-trigger" onClick={() => setOpen(o => !o)}>
-        {value === "custom" ? "custom range" : value} <i className="fas fa-caret-down" />
+        {value} <i className="fas fa-caret-down" />
       </button>
       {open && (
         <div className="range-dropdown-menu">
@@ -144,22 +140,11 @@ function RangeDropdown({
               key={opt}
               type="button"
               className={`range-dropdown-item ${value === opt ? "active" : ""}`}
-              onClick={() => {
-                onChange(opt);
-                if (opt !== "custom") setOpen(false);
-              }}
+              onClick={() => { onChange(opt); setOpen(false); }}
             >
               {opt}
             </button>
           ))}
-          {value === "custom" && options.includes("custom") && (
-            <div className="range-dropdown-custom">
-              <input type="date" value={customStart} onChange={(e) => onCustomChange(e.target.value, customEnd)} />
-              <span>to</span>
-              <input type="date" value={customEnd} onChange={(e) => onCustomChange(customStart, e.target.value)} />
-              <button type="button" className="btn-mini" onClick={() => setOpen(false)}>Apply</button>
-            </div>
-          )}
         </div>
       )}
     </span>
@@ -191,8 +176,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
 
   // ── Section 3: budget cap ──
   const [budgetView, setBudgetView] = useState<ViewRange>("weekly");
-  const [budgetCustomStart, setBudgetCustomStart] = useState(isoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
-  const [budgetCustomEnd, setBudgetCustomEnd] = useState(isoDate(new Date()));
   const [showAddBudgetModal, setShowAddBudgetModal] = useState(false);
   const [newBudgetAmount, setNewBudgetAmount] = useState("");
   const [newBudgetStart, setNewBudgetStart] = useState(isoDate(new Date()));
@@ -223,8 +206,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
 
   // ── Section 5: nutrition ──
   const [nutritionView, setNutritionView] = useState<ViewRange>("monthly");
-  const [nutritionCustomStart, setNutritionCustomStart] = useState(isoDate(new Date(Date.now() - 150 * 24 * 60 * 60 * 1000)));
-  const [nutritionCustomEnd, setNutritionCustomEnd] = useState(isoDate(new Date()));
   const [nutritionData, setNutritionData] = useState<NutritionAnalytics>({
     labels: [],
     protein: [],
@@ -242,13 +223,13 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
       loadBudgetAnalytics();
       loadNutritionAnalytics();
     }
-  }, [budgetView, budgetCustomStart, budgetCustomEnd, student]);
+  }, [budgetView, student]);
 
   useEffect(() => {
     if (student) {
       loadNutritionAnalytics();
     }
-  }, [nutritionView, nutritionCustomStart, nutritionCustomEnd]);
+  }, [nutritionView]);
 
   useEffect(() => {
     if (student) {
@@ -363,33 +344,10 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
 
   async function loadNutritionAnalytics() {
     try {
-      let startDate = nutritionCustomStart;
-      let endDate = nutritionCustomEnd;
-      
-      if (nutritionView === "weekly") {
-        const end = new Date();
-        const start = new Date(end);
-        start.setDate(start.getDate() - 7);
-        startDate = isoDate(start);
-        endDate = isoDate(end);
-      } else if (nutritionView === "monthly") {
-        const end = new Date();
-        const start = new Date(end);
-        start.setMonth(start.getMonth() - 1);
-        startDate = isoDate(start);
-        endDate = isoDate(end);
-      }
-      
-      const nutrition = await getNutritionAnalytics(
-        token,
-        nutritionView === "custom" ? "custom" : nutritionView,
-        startDate,
-        endDate
-      );
+      const nutrition = await getNutritionAnalytics(token, nutritionView);
       setNutritionData(nutrition);
     } catch (err) {
       console.error("Error loading nutrition analytics:", err);
-      // Use fallback data
       const now = new Date();
       const labels = [];
       const protein = [];
@@ -716,9 +674,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
               <RangeDropdown
                 value={budgetView}
                 onChange={setBudgetView}
-                customStart={budgetCustomStart}
-                customEnd={budgetCustomEnd}
-                onCustomChange={(s, e) => { setBudgetCustomStart(s); setBudgetCustomEnd(e); }}
                 options={["weekly", "monthly"]}
               />
             </div>
@@ -911,9 +866,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
               <RangeDropdown
                 value={nutritionView}
                 onChange={setNutritionView}
-                customStart={nutritionCustomStart}
-                customEnd={nutritionCustomEnd}
-                onCustomChange={(s, e) => { setNutritionCustomStart(s); setNutritionCustomEnd(e); }}
+                options={["daily", "weekly", "monthly"]}
               />
             </div>
             <div className="pf-nutrition-numbers">

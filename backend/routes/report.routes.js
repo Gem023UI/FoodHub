@@ -204,138 +204,94 @@ reportRouter.get("/spending", auth_1.authenticateRequest, async (request, respon
 // ── STUDENT NUTRITION ANALYTICS ──────────────────────────────────────────
 reportRouter.get("/nutrition", auth_1.authenticateRequest, async (request, response) => {
     const studentId = request.userId;
-    const { period, startDate, endDate } = request.query;
-    
+    const { period } = request.query;
+    const view = ["daily", "weekly", "monthly"].includes(period) ? period : "daily";
+
     try {
         const now = new Date();
-        let start = new Date();
-        let labels = [];
-        
-        if (period === "weekly") {
-            start.setDate(start.getDate() - 7);
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                labels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
-            }
-        } else if (period === "monthly") {
-            start.setMonth(start.getMonth() - 1);
-            const days = Math.min(30, Math.floor((now - start) / (1000 * 60 * 60 * 24)));
-            for (let i = days; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-            }
-        } else if (period === "custom" && startDate && endDate) {
-            start = new Date(startDate);
-            const end = new Date(endDate);
-            const days = Math.min(30, Math.floor((end - start) / (1000 * 60 * 60 * 24)));
-            for (let i = 0; i <= days; i++) {
+        let start;
+        let labels;
+
+        if (view === "daily") {
+            // Calendar week: Sunday → Saturday
+            const dayOfWeek = now.getDay();
+            start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+            labels = [];
+            for (let i = 0; i < 7; i++) {
                 const d = new Date(start);
-                d.setDate(d.getDate() + i);
-                labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                d.setDate(start.getDate() + i);
+                labels.push(d.toLocaleDateString("en-US", { weekday: "short" }));
             }
+        } else if (view === "weekly") {
+            // Calendar month, bucketed into 4 weeks
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            labels = ["Week 1", "Week 2", "Week 3", "Week 4"];
         } else {
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                labels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
-            }
+            // Calendar year, bucketed into 12 months
+            start = new Date(now.getFullYear(), 0, 1);
+            labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         }
-        
-        const query = { 
-            studentId, 
-            orderStatus: "completed"
+
+        const query = {
+            studentId,
+            orderStatus: "completed",
+            createdAt: { $gte: start, $lte: now }
         };
-        
-        if (startDate) {
-            const startDateObj = new Date(startDate);
-            startDateObj.setHours(0, 0, 0, 0);
-            query.createdAt = { $gte: startDateObj };
-        }
-        if (endDate) {
-            const endDateObj = new Date(endDate);
-            endDateObj.setHours(23, 59, 59, 999);
-            query.createdAt = { ...query.createdAt, $lte: endDateObj };
-        }
-        if (!startDate && !endDate && period !== "custom") {
-            query.createdAt = { $gte: start };
-        }
-        
-        console.log("🔬 Nutrition query:", JSON.stringify(query));
-        
+
         const orders = await models_1.OrderModel.find(query)
             .select("orderLines createdAt")
             .lean();
-        
-        console.log(`🔬 Found ${orders.length} completed orders`);
-        
-        const dailyNutrition = {};
-        
+
+        const proteinValues = new Array(labels.length).fill(0);
+        const carbsValues = new Array(labels.length).fill(0);
+        const caloriesValues = new Array(labels.length).fill(0);
+
         for (const order of orders) {
-            const dateKey = order.createdAt.toISOString().split('T')[0];
-            
-            if (!dailyNutrition[dateKey]) {
-                dailyNutrition[dateKey] = {
-                    protein: 0,
-                    carbs: 0,
-                    calories: 0,
-                    count: 0
-                };
+            let bucketIndex;
+            if (view === "daily") {
+                bucketIndex = Math.floor((order.createdAt - start) / (24 * 60 * 60 * 1000));
+                if (bucketIndex < 0 || bucketIndex > 6) continue;
+            } else if (view === "weekly") {
+                const dayOfMonth = order.createdAt.getDate();
+                bucketIndex = Math.min(3, Math.floor((dayOfMonth - 1) / 7));
+            } else {
+                bucketIndex = order.createdAt.getMonth();
             }
-            
+
             if (order.orderLines && order.orderLines.length > 0) {
                 for (const line of order.orderLines) {
                     if (line.nutrition) {
                         const quantity = line.quantity || 1;
-                        dailyNutrition[dateKey].protein += (line.nutrition.protein || 0) * quantity;
-                        dailyNutrition[dateKey].carbs += (line.nutrition.carbs || 0) * quantity;
-                        dailyNutrition[dateKey].calories += (line.nutrition.calories || 0) * quantity;
-                        dailyNutrition[dateKey].count += 1;
+                        proteinValues[bucketIndex] += (line.nutrition.protein || 0) * quantity;
+                        carbsValues[bucketIndex] += (line.nutrition.carbs || 0) * quantity;
+                        caloriesValues[bucketIndex] += (line.nutrition.calories || 0) * quantity;
                     }
                 }
             }
         }
-        
-        const proteinValues = [];
-        const carbsValues = [];
-        const caloriesValues = [];
-        
-        for (const label of labels) {
-            const dateStr = getDateStrFromLabel(label);
-            const dayData = dailyNutrition[dateStr] || { protein: 0, carbs: 0, calories: 0 };
-            proteinValues.push(Math.round(dayData.protein));
-            carbsValues.push(Math.round(dayData.carbs));
-            caloriesValues.push(Math.round(dayData.calories));
+
+        let elapsedDays;
+        if (view === "daily") {
+            elapsedDays = Math.min(7, Math.floor((now - start) / (24 * 60 * 60 * 1000)) + 1);
+        } else if (view === "weekly") {
+            elapsedDays = now.getDate();
+        } else {
+            elapsedDays = Math.floor((now - start) / (24 * 60 * 60 * 1000)) + 1;
         }
-        
-        const daysWithData = Object.keys(dailyNutrition).length;
-        let avgProtein = 0;
-        let avgCarbs = 0;
-        let avgCalories = 0;
-        
-        if (daysWithData > 0) {
-            const totalProtein = Object.values(dailyNutrition).reduce((sum, d) => sum + d.protein, 0);
-            const totalCarbs = Object.values(dailyNutrition).reduce((sum, d) => sum + d.carbs, 0);
-            const totalCalories = Object.values(dailyNutrition).reduce((sum, d) => sum + d.calories, 0);
-            
-            avgProtein = Math.round(totalProtein / daysWithData);
-            avgCarbs = Math.round(totalCarbs / daysWithData);
-            avgCalories = Math.round(totalCalories / daysWithData);
-        }
-        
-        console.log("🔬 Nutrition averages:", { avgProtein, avgCarbs, avgCalories });
-        console.log("🔬 Daily nutrition data:", dailyNutrition);
-        
+
+        const totalProtein = proteinValues.reduce((sum, v) => sum + v, 0);
+        const totalCarbs = carbsValues.reduce((sum, v) => sum + v, 0);
+        const totalCalories = caloriesValues.reduce((sum, v) => sum + v, 0);
+
         response.json({
-            labels: labels,
-            protein: proteinValues,
-            carbs: carbsValues,
-            calories: caloriesValues,
+            labels,
+            protein: proteinValues.map(v => Math.round(v)),
+            carbs: carbsValues.map(v => Math.round(v)),
+            calories: caloriesValues.map(v => Math.round(v)),
             averages: {
-                protein: avgProtein,
-                carbs: avgCarbs,
-                calories: avgCalories
+                protein: Math.round(totalProtein / Math.max(1, elapsedDays)),
+                carbs: Math.round(totalCarbs / Math.max(1, elapsedDays)),
+                calories: Math.round(totalCalories / Math.max(1, elapsedDays))
             }
         });
     } catch (error) {
