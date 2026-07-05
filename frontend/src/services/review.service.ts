@@ -4,6 +4,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 // ── Review Types ──────────────────────────────────────────────────────
 export interface ProductReview {
   _id: string;
+  orderId?: string;
   reviewEmail: string;
   reviewProfileUrl: string | null;
   rating: number;
@@ -12,11 +13,11 @@ export interface ProductReview {
   reviewDate: string;
 }
 
-// ── Review Functions ───────────────────────────────────────────────────
 export async function createReview(
   token: string,
   reviewData: {
     productId: string;
+    orderId: string;
     rating: number;
     comment: string;
     images?: string[];
@@ -53,4 +54,21 @@ export async function deleteReview(token: string, productId: string, reviewId: s
     const data = await response.json() as { message?: string };
     throw new Error(data.message ?? "Failed to delete review");
   }
+}
+
+export async function uploadReviewImages(token: string, files: File[]): Promise<string[]> {
+  const formData = new FormData();
+  files.slice(0, 5).forEach(file => formData.append("images", file));
+
+  const response = await fetch(`${apiBaseUrl}/uploads/review`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(data.message ?? "Failed to upload review images");
+  }
+  const data = await response.json() as { urls: string[] };
+  return data.urls;
 }

@@ -8,41 +8,46 @@ const stall_controller_1 = require("./stall.controller");
 const models_1 = require("../models");
 const ids_1 = require("../utils/ids");
 
-// ── CREATE REVIEW (only if order is completed) ──────────────────────────
-async function createReview({ studentId, productId, rating, comment, images }) {
+// ── CREATE REVIEW (only if this specific order is completed) ───────────
+async function createReview({ studentId, productId, orderId, rating, comment, images }) {
     if (!(0, ids_1.isValidObjectId)(productId)) {
         return { success: false, reason: "invalid_product_id" };
     }
+    if (!orderId || !(0, ids_1.isValidObjectId)(orderId)) {
+        return { success: false, reason: "invalid_order_id" };
+    }
 
-    // Get student info
     const student = await models_1.StudentModel.findById(studentId).select("email profilePictureUrl firstName lastName");
     if (!student) {
         return { success: false, reason: "student_not_found" };
     }
 
-    // Check if student has completed this product in an order
+    // Verify THIS order (not just any order) is completed and contains the product
     const order = await models_1.OrderModel.findOne({
+        _id: orderId,
         studentId,
         "orderLines.productId": productId,
         orderStatus: "completed"
     });
-
     if (!order) {
         return { success: false, reason: "order_not_completed" };
     }
 
-    // Check if student already reviewed this product
+    // Check if THIS order has already been reviewed for this product
     const stallWithReview = await models_1.StallModel.findOne({
-        "products._id": productId,
-        "products.reviews.reviewEmail": student.email
+        products: {
+            $elemMatch: {
+                _id: productId,
+                reviews: { $elemMatch: { reviewEmail: student.email, orderId: orderId } }
+            }
+        }
     });
-
     if (stallWithReview) {
         return { success: false, reason: "already_reviewed" };
     }
 
-    // Create the review data
     const reviewData = {
+        orderId,
         reviewEmail: student.email,
         reviewProfileUrl: student.profilePictureUrl || null,
         rating: rating,
@@ -51,20 +56,17 @@ async function createReview({ studentId, productId, rating, comment, images }) {
         reviewDate: new Date()
     };
 
-    // Add review using stall controller
     const result = await (0, stall_controller_1.addReview)(productId, reviewData);
-
     if (!result.success) {
         return result;
     }
 
-    // Update product's favorite count? No, reviews don't affect favorites
-    // Return the created review
-    return { 
-        success: true, 
-        data: { 
+    return {
+        success: true,
+        data: {
             review: {
                 _id: result.data.review._id,
+                orderId: result.data.review.orderId,
                 reviewEmail: result.data.review.reviewEmail,
                 reviewProfileUrl: result.data.review.reviewProfileUrl,
                 rating: result.data.review.rating,
@@ -72,8 +74,8 @@ async function createReview({ studentId, productId, rating, comment, images }) {
                 reviewImages: result.data.review.reviewImages,
                 reviewDate: result.data.review.reviewDate,
                 productId: productId
-            } 
-        } 
+            }
+        }
     };
 }
 

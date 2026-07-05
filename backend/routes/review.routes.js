@@ -33,14 +33,14 @@ reviewsRouter.get("/product/:productId", async (request, response) => {
 
 // ── CREATE REVIEW ──────────────────────────────────────────────────────
 reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) => {
-    const { productId, rating, comment, images } = request.body;
+    const { productId, orderId, rating, comment, images } = request.body;
     const studentId = request.userId;
 
-    console.log("📝 Review request:", { studentId, productId, rating, comment });
+    console.log("📝 Review request:", { studentId, productId, orderId, rating, comment });
 
-    if (!productId || !rating) {
+    if (!productId || !orderId || !rating) {
         return response.status(400).json({ 
-            message: "productId and rating are required." 
+            message: "productId, orderId, and rating are required." 
         });
     }
 
@@ -54,6 +54,7 @@ reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) =>
         const result = await (0, review_controller_1.createReview)({
             studentId,
             productId,
+            orderId,
             rating: Number(rating),
             comment: comment || "",
             images: images || []
@@ -62,9 +63,10 @@ reviewsRouter.post("/", auth_1.authenticateRequest, async (request, response) =>
         if (!result.success) {
             const messages = {
                 invalid_product_id: "Invalid product ID.",
+                invalid_order_id: "Invalid order ID.",
                 order_not_completed: "You must have a completed order for this product to review it.",
                 student_not_found: "Student not found.",
-                already_reviewed: "You have already reviewed this product.",
+                already_reviewed: "You have already reviewed this product for this order.",
                 product_not_found: "Product not found."
             };
             return response.status(400).json({ 

@@ -109,6 +109,19 @@ function createAdminProfileUpload() {
   return multer({ storage });
 }
 
+function createReviewUpload() {
+  initCloudinary();
+  const storage = new CloudinaryStorage({
+    cloudinary,
+    params: {
+      folder:         "foodhub/reviews",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 1000, crop: "limit" }],
+    },
+  });
+  return multer({ storage });
+}
+
 module.exports = { 
   initCloudinary, 
   uploadToCloudinary,
@@ -116,5 +129,6 @@ module.exports = {
   createProductUpload, 
   createStudentProfileUpload, 
   createVendorProfileUpload,
-  createAdminProfileUpload
+  createAdminProfileUpload,
+  createReviewUpload
 };

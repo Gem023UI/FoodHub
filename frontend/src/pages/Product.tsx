@@ -3,7 +3,7 @@ import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { toggleFavorite, checkFavorite, getFavorites } from "../services/favorite.service";
 import { getProductDetails, type Product, type ProductReview } from "../services/product.service";
-import { getReviewsByProduct, createReview } from "../services/review.service";
+import { getReviewsByProduct } from "../services/review.service";
 import "../styles/Product.css";
 
 interface ProductProps {
@@ -21,11 +21,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
   const [isFavorited, setIsFavorited] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState("");
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (productId) {
@@ -75,34 +70,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
       } : null);
     } catch (err) {
       console.error("Error toggling favorite:", err);
-    }
-  }
-
-  async function handleSubmitReview(e: React.FormEvent) {
-    e.preventDefault();
-    if (!token) {
-      onNavigate("login");
-      return;
-    }
-
-    setIsSubmittingReview(true);
-    setError(null);
-    try {
-      const result = await createReview(token, {
-        productId,
-        rating: reviewRating,
-        comment: reviewComment,
-      });
-      setReviews(prev => [...prev, result.review]);
-      setShowReviewModal(false);
-      setReviewComment("");
-      setReviewRating(5);
-      setReviewSuccess("Review submitted successfully!");
-      setTimeout(() => setReviewSuccess(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit review");
-    } finally {
-      setIsSubmittingReview(false);
     }
   }
 
@@ -228,7 +195,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
           ← Back to Stalls
         </button>
 
-        {reviewSuccess && <div className="alert alert-success">{reviewSuccess}</div>}
         {error && <div className="alert alert-error">{error}</div>}
 
         <div className="product-content">
@@ -374,15 +340,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
         <div className="reviews-section">
           <div className="reviews-header">
             <h2>Reviews ({reviews.length})</h2>
-            {token && (
-              <button 
-                className="btn-primary"
-                onClick={() => setShowReviewModal(true)}
-                disabled={!product.available}
-              >
-                Write a Review
-              </button>
-            )}
           </div>
           {reviews.length === 0 ? (
             <p className="no-reviews">No reviews yet. Be the first to review!</p>
@@ -428,52 +385,6 @@ export function Product({ token, productId, onNavigate, onLogout }: ProductProps
           )}
         </div>
       </div>
-
-      {/* Review Modal */}
-      {showReviewModal && (
-        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Write a Review</h2>
-              <button className="modal-close" onClick={() => setShowReviewModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSubmitReview} className="review-form">
-              <div className="form-group">
-                <label>Rating</label>
-                <div className="rating-selector">
-                  {[1, 2, 3, 4, 5].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      className={`rating-star ${num <= reviewRating ? "active" : ""}`}
-                      onClick={() => setReviewRating(num)}
-                    >
-                      ⭐
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Comment</label>
-                <textarea
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="Share your experience with this product..."
-                  rows={4}
-                />
-              </div>
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowReviewModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={isSubmittingReview}>
-                  {isSubmittingReview ? "Submitting..." : "Submit Review"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       <Footer onNavigate={onNavigate} />
     </div>

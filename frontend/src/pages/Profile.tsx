@@ -16,6 +16,7 @@ import {
   type StudentBudgetCap
 } from "../services/budget.service";
 import { getNutritionAnalytics, type NutritionAnalytics } from "../services/report.service";
+import { getReviewsByProduct, createReview, uploadReviewImages, type ProductReview } from "../services/review.service";
 import "../styles/Profile.css";
 
 interface ProfileProps {
@@ -165,12 +166,8 @@ function RangeDropdown({
   );
 }
 
-function statusIcon(status: string) {
-  if (status === "pending") return "fa-clock";
-  if (status === "preparing") return "fa-thumbs-up";
-  if (status === "ready") return "fa-hourglass-half";
-  if (status === "completed") return "fa-check";
-  return "fa-times";
+function orderStatusIcon(status: string) {
+  return status === "completed" ? "fa-eye" : "fa-clock";
 }
 
 export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
@@ -215,7 +212,10 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   const [orderRangeStart, setOrderRangeStart] = useState(isoDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)));
   const [orderRangeEnd, setOrderRangeEnd] = useState(isoDate(new Date()));
   const [showOrderDatePicker, setShowOrderDatePicker] = useState(false);
-  const [reviewTarget, setReviewTarget] = useState<{ orderId: string; productId: string; productName: string } | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<OrderLike | null>(null);
+  const [orderDetailsTarget, setOrderDetailsTarget] = useState<OrderLike | null>(null);
+  const [reviewViewTarget, setReviewViewTarget] = useState<{ order: OrderLike; review: ProductReview } | null>(null);
+  const [productReviewsMap, setProductReviewsMap] = useState<Record<string, ProductReview[]>>({});
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewImages, setReviewImages] = useState<File[]>([]);
@@ -255,6 +255,24 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
       loadOrders();
     }
   }, [orderRangeStart, orderRangeEnd]);
+
+  useEffect(() => {
+    async function loadProductReviews() {
+      const productIds = Array.from(new Set(
+        orders.flatMap(o => (o.orderLines || []).map(l => l.productId))
+      ));
+      if (productIds.length === 0) return;
+      try {
+        const entries = await Promise.all(
+          productIds.map(async (id) => [id, await getReviewsByProduct(id)] as const)
+        );
+        setProductReviewsMap(Object.fromEntries(entries));
+      } catch (err) {
+        console.error("Error loading product reviews for order history:", err);
+      }
+    }
+    loadProductReviews();
+  }, [orders]);
 
   async function loadBudgetCaps() {
     try {
@@ -399,6 +417,24 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     }
   }
 
+  function getOrderReview(order: OrderLike): ProductReview | null {
+    if (!order.orderLines?.length) return null;
+    for (const line of order.orderLines) {
+      const match = (productReviewsMap[line.productId] || []).find(
+        r => r.orderId === order._id
+      );
+      if (match) return match;
+    }
+    return null;
+  }
+
+  function isOrderFullyReviewed(order: OrderLike): boolean {
+    if (!order.orderLines?.length) return false;
+    return order.orderLines.every(line =>
+      (productReviewsMap[line.productId] || []).some(r => r.orderId === order._id)
+    );
+  }
+
   // ── Section 1 handlers ──
   function handlePictureSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -484,10 +520,12 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     const start = new Date(orderRangeStart);
     const end = new Date(orderRangeEnd);
     end.setHours(23, 59, 59, 999);
-    return orders.filter(o => {
-      const d = new Date(o.createdAt);
-      return d >= start && d <= end;
-    });
+    return orders
+      .filter(o => {
+        const d = new Date(o.createdAt);
+        return d >= start && d <= end;
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [orders, orderRangeStart, orderRangeEnd]);
 
   // ── Section 5 derived data ──
@@ -540,44 +578,46 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   }
 
   async function handleSubmitReview() {
-    if (!reviewTarget) return;
+    if (!reviewTarget?.orderLines?.length) return;
     setIsSubmittingReview(true);
     setError(null);
-    
-    try {
-      console.log("📝 Submitting review:", {
-        productId: reviewTarget.productId,
-        rating: reviewRating,
-        comment: reviewComment
-      });
-      
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? "/api"}/reviews`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          productId: reviewTarget.productId,
-          rating: reviewRating,
-          comment: reviewComment,
-          images: [] // You can add image upload functionality later
-        }),
-      });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to submit review");
+    try {
+      let imageUrls: string[] = [];
+      if (reviewImages.length > 0) {
+        imageUrls = await uploadReviewImages(token, reviewImages);
       }
-      
+
+      const results = await Promise.allSettled(
+        reviewTarget.orderLines.map(line =>
+          createReview(token, {
+            productId: line.productId,
+            orderId: reviewTarget._id,
+            rating: reviewRating,
+            comment: reviewComment,
+            images: imageUrls
+          })
+        )
+      );
+
+      const anySucceeded = results.some(r => r.status === "fulfilled");
+      if (!anySucceeded) {
+        const firstError = results.find(r => r.status === "rejected") as PromiseRejectedResult | undefined;
+        throw new Error(firstError?.reason instanceof Error ? firstError.reason.message : "Failed to submit review");
+      }
+
       setReviewTarget(null);
       setReviewRating(5);
       setReviewComment("");
       setReviewImages([]);
       setSuccessMsg("Review submitted successfully!");
       setTimeout(() => setSuccessMsg(null), 3000);
-      await loadProfile();
+
+      const productIds = Array.from(new Set(orders.flatMap(o => (o.orderLines || []).map(l => l.productId))));
+      const entries = await Promise.all(
+        productIds.map(async (id) => [id, await getReviewsByProduct(id)] as const)
+      );
+      setProductReviewsMap(Object.fromEntries(entries));
     } catch (err) {
       console.error("Error submitting review:", err);
       setError(err instanceof Error ? err.message : "Failed to submit review");
@@ -799,28 +839,46 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
                   <p>Payment Status: {order.paymentStatus || (order.paymentRecord?.status === "paid" ? "Paid" : "Unpaid")}</p>
                 </div>
                 <div className="pf-order-icons">
-                  <span className="pf-order-icon" title={order.orderStatus}>
-                    <i className={`fas ${statusIcon(order.orderStatus)}`} />
-                  </span>
-                  <button
-                    className="pf-order-icon pf-order-icon-btn"
-                    title={order.orderStatus === "completed" ? "Add review" : "Not completed"}
-                    onClick={() => {
-                      if (order.orderStatus === "completed") {
-                        const firstItem = order.orderLines?.[0] || order.items?.[0];
-                        if (firstItem) {
-                          setReviewTarget({ 
-                            orderId: order._id, 
-                            productId: firstItem.productId, 
-                            productName: firstItem.productName 
-                          });
-                        }
-                      }
-                    }}
-                    disabled={order.orderStatus !== "completed"}
-                  >
-                    <i className="fas fa-pen" />
-                  </button>
+                  {order.orderStatus === "completed" ? (
+                    <button
+                      className="pf-order-icon pf-order-icon-btn"
+                      title="View order details"
+                      onClick={() => setOrderDetailsTarget(order)}
+                    >
+                      <i className="fas fa-eye" />
+                    </button>
+                  ) : (
+                    <span className="pf-order-icon" title={order.orderStatus}>
+                      <i className="fas fa-clock" />
+                    </span>
+                  )}
+
+                  {order.orderStatus === "completed" ? (
+                    isOrderFullyReviewed(order) ? (
+                      <button
+                        className="pf-order-icon pf-order-icon-btn"
+                        title="View your review"
+                        onClick={() => {
+                          const review = getOrderReview(order);
+                          if (review) setReviewViewTarget({ order, review });
+                        }}
+                      >
+                        <i className="fas fa-eye" />
+                      </button>
+                    ) : (
+                      <button
+                        className="pf-order-icon pf-order-icon-btn"
+                        title="Add review"
+                        onClick={() => setReviewTarget(order)}
+                      >
+                        <i className="fas fa-pen" />
+                      </button>
+                    )
+                  ) : (
+                    <span className="pf-order-icon" title="Not completed yet">
+                      <i className="fas fa-clock" />
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -990,7 +1048,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
       {reviewTarget && (
         <div className="pf-modal-overlay" onClick={() => setReviewTarget(null)}>
           <div className="pf-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Review {reviewTarget.productName}</h3>
+            <h3>Review Your Order ({reviewTarget.orderLines?.length || 0} item{(reviewTarget.orderLines?.length || 0) === 1 ? "" : "s"})</h3>
             <div className="form-group">
               <label>Rating</label>
               <div className="pf-star-row">
@@ -1026,6 +1084,60 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
           </div>
         </div>
       )}
+
+      {orderDetailsTarget && (
+        <div className="pf-modal-overlay" onClick={() => setOrderDetailsTarget(null)}>
+          <div className="pf-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Order Details</h3>
+            <div className="pf-order-details-list">
+              {(orderDetailsTarget.orderLines || []).map((line, i) => (
+                <div key={i} className="pf-order-details-row">
+                  <span className="pf-order-details-name">{line.productName}</span>
+                  <span className="pf-order-details-qty">× {line.quantity}</span>
+                  <span className="pf-order-details-subtotal">Php {line.subtotal.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="pf-order-details-total">
+              <span>Total</span>
+              <span>Php {(orderDetailsTarget.totalPrice || orderDetailsTarget.totalAmount || 0).toFixed(2)}</span>
+            </div>
+            <div className="pf-modal-actions">
+              <button className="pf-btn pf-btn-yellow" onClick={() => setOrderDetailsTarget(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewViewTarget && (
+        <div className="pf-modal-overlay" onClick={() => setReviewViewTarget(null)}>
+          <div className="pf-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Your Review</h3>
+            <div className="review-rating">
+              {"⭐".repeat(reviewViewTarget.review.rating)}{"☆".repeat(5 - reviewViewTarget.review.rating)}
+            </div>
+            {reviewViewTarget.review.comment && (
+              <p className="review-comment">{reviewViewTarget.review.comment}</p>
+            )}
+            {reviewViewTarget.review.reviewImages?.length > 0 && (
+              <div className="review-photos">
+                {reviewViewTarget.review.reviewImages.map((photo, i) => (
+                  <img key={i} src={photo} alt={`Review ${i + 1}`} />
+                ))}
+              </div>
+            )}
+            <div className="review-date">
+              {new Date(reviewViewTarget.review.reviewDate).toLocaleDateString("en-US", {
+                year: "numeric", month: "short", day: "numeric"
+              })}
+            </div>
+            <div className="pf-modal-actions">
+              <button className="pf-btn pf-btn-yellow" onClick={() => setReviewViewTarget(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

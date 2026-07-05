@@ -17,6 +17,7 @@ const phoneValidator = {
 
 // ── Product Review Subschema ─────────────────────────────────────────────
 const productReviewSchema = new mongoose_1.Schema({
+  orderId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Order", default: null },
   reviewEmail: { type: String, required: true, trim: true, lowercase: true },
   reviewProfileUrl: { type: String, trim: true, default: null },
   rating: { type: Number, required: true, min: 1, max: 5 },

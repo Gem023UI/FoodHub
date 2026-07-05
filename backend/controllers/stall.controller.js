@@ -231,37 +231,32 @@ async function addReview(productId, reviewData) {
         return { success: false, reason: "invalid_product_id" };
     }
 
-    // Find stall containing this product
-    const stall = await stall_model_1.StallModel.findOne({
-        "products._id": productId
-    });
+    const stall = await stall_model_1.StallModel.findOneAndUpdate(
+        { "products._id": productId },
+        { $push: { "products.$.reviews": reviewData } },
+        { new: true }
+    );
 
     if (!stall) {
         return { success: false, reason: "product_not_found" };
     }
 
-    // Find the product
     const product = stall.products.find(p => p._id.toString() === productId);
     if (!product) {
         return { success: false, reason: "product_not_found" };
     }
 
-    // Add the review
-    product.reviews.push(reviewData);
-    await stall.save();
-
-    // Get the newly added review
     const addedReview = product.reviews[product.reviews.length - 1];
 
-    return { 
-        success: true, 
-        data: { 
+    return {
+        success: true,
+        data: {
             review: {
                 ...addedReview.toObject(),
                 productId: product._id,
                 productName: product.productName
-            } 
-        } 
+            }
+        }
     };
 }
 
