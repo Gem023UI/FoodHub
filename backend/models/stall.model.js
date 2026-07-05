@@ -80,7 +80,7 @@ const vendorSchema = new mongoose_1.Schema({
   },
   status: { 
     type: String, 
-    enum: ["unverified", "verified", "deactivated"],
+    enum: ["unverified", "verified", "deactivated", "suspended"],
     default: "verified"
   }
 }, { timestamps: true });
