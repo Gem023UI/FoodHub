@@ -202,3 +202,18 @@ export async function addVendorAccount(token: string, stallId: string, input: Ad
   }
   return response.json();
 }
+
+export async function uploadStallPicture(token: string, file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append("image", file);
+  const response = await fetch(`${apiBaseUrl}/uploads/stall-image`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(data.message ?? "Failed to upload stall picture");
+  }
+  return response.json();
+}

@@ -163,10 +163,16 @@ stallsRouter.post("/", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("a
     }
 });
 
-// ── UPDATE STALL ──────────────────────────────────────────────────────
-stallsRouter.patch("/:stallId", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("admin"), async (request, response) => {
+// ── UPDATE STALL (admin: any stall; vendor: only their own) ────────────
+stallsRouter.patch("/:stallId", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor", "admin"), async (request, response) => {
     const stallId = firstParam(request.params.stallId);
     try {
+        if (request.role === "vendor") {
+            const vendorStall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
+            if (!vendorStall || vendorStall._id.toString() !== stallId) {
+                return response.status(403).json({ message: "Unauthorized to update this stall." });
+            }
+        }
         const stall = await (0, stall_controller_1.updateStall)(stallId, request.body);
         if (!stall) {
             return response.status(404).json({ message: "Stall not found." });

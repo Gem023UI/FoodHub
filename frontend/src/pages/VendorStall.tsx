@@ -3,7 +3,7 @@ import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
 import { ProductCard } from "../components/ProductCard";
 import { VendorOrderCard } from "../components/VendorOrderCard";
-import { getVendorStall, setStallStatus, addVendorAccount } from "../services/stall.service";
+import { getVendorStall, setStallStatus, addVendorAccount, updateStall, uploadStallPicture } from "../services/stall.service";
 import { getStallOrders, updateOrderStatus, updatePaymentStatus, Order } from "../services/order.service";
 import { createProduct, uploadProductImages, ProductCategory } from "../services/product.service";
 import tupLogo from "../../images/Logo.png";
@@ -55,6 +55,24 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
   const [productPhotos, setProductPhotos] = useState<File[]>([]);
   const [productPhotoPreviews, setProductPhotoPreviews] = useState<string[]>([]);
 
+  // ── Edit Stall modal ──
+  const [showEditStallModal, setShowEditStallModal] = useState(false);
+  const [isSubmittingStall, setIsSubmittingStall] = useState(false);
+  const [stallForm, setStallForm] = useState({
+    stallDescription: "",
+    openTime: "",
+    closingTime: "",
+    cashAvailable: true,
+    gcashAvailable: false,
+    gcashAccountName: "",
+    gcashPhoneNumber: "",
+    paymayaAvailable: false,
+    paymayaAccountName: "",
+    paymayaPhoneNumber: "",
+  });
+  const [stallPictureFile, setStallPictureFile] = useState<File | null>(null);
+  const [stallPicturePreview, setStallPicturePreview] = useState<string | null>(null);
+
   useEffect(() => {
     fetchVendorData();
   }, [token]);
@@ -91,6 +109,78 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
       setError(err instanceof Error ? err.message : "Failed to update stall status");
     } finally {
       setIsTogglingStatus(false);
+    }
+  }
+
+  function openEditStallModal() {
+    setStallForm({
+      stallDescription: stall.stallDescription || "",
+      openTime: stall.openHours?.openTime || "",
+      closingTime: stall.openHours?.closingTime || "",
+      cashAvailable: stall.paymentMethod?.cash?.available ?? true,
+      gcashAvailable: stall.paymentMethod?.gcash?.available ?? false,
+      gcashAccountName: stall.paymentMethod?.gcash?.accountName || "",
+      gcashPhoneNumber: stall.paymentMethod?.gcash?.phoneNumber || "",
+      paymayaAvailable: stall.paymentMethod?.paymaya?.available ?? false,
+      paymayaAccountName: stall.paymentMethod?.paymaya?.accountName || "",
+      paymayaPhoneNumber: stall.paymentMethod?.paymaya?.phoneNumber || "",
+    });
+    setStallPictureFile(null);
+    setStallPicturePreview(stall.stallPicture || null);
+    setShowEditStallModal(true);
+  }
+
+  function handleStallPictureSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStallPictureFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setStallPicturePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function handleUpdateStall(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+    setIsSubmittingStall(true);
+
+    try {
+      let stallPicture = stall.stallPicture;
+      if (stallPictureFile) {
+        const uploaded = await uploadStallPicture(token, stallPictureFile);
+        stallPicture = uploaded.url;
+      }
+
+      const { stall: updatedStall } = await updateStall(token, stall._id, {
+        stallDescription: stallForm.stallDescription,
+        stallPicture,
+        openHours: {
+          openTime: stallForm.openTime,
+          closingTime: stallForm.closingTime,
+        },
+        paymentMethod: {
+          cash: { available: stallForm.cashAvailable },
+          gcash: {
+            available: stallForm.gcashAvailable,
+            accountName: stallForm.gcashAccountName,
+            phoneNumber: stallForm.gcashPhoneNumber,
+          },
+          paymaya: {
+            available: stallForm.paymayaAvailable,
+            accountName: stallForm.paymayaAccountName,
+            phoneNumber: stallForm.paymayaPhoneNumber,
+          },
+        },
+      });
+
+      setStall(updatedStall);
+      setShowEditStallModal(false);
+      setSuccessMsg("Stall updated successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update stall");
+    } finally {
+      setIsSubmittingStall(false);
     }
   }
 
@@ -258,6 +348,9 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
         }}
       >
         <div className="vendor-hero-toolbar">
+          <button className="hero-action-btn" onClick={openEditStallModal}>
+            <i className="fas fa-pen"></i> Edit Stall
+          </button>
           <button className="hero-action-btn" onClick={() => setShowAddVendorModal(true)}>
             <i className="fas fa-user-plus"></i> Add Vendor
           </button>
@@ -502,6 +595,161 @@ export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPage
                 <button type="button" className="btn-secondary" onClick={() => setShowAddProductModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={isSubmittingProduct}>
                   {isSubmittingProduct ? "Adding…" : "Add Product"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EDIT STALL MODAL ── */}
+      {showEditStallModal && (
+        <div className="modal-overlay" onClick={() => setShowEditStallModal(false)}>
+          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit Stall</h2>
+              <button className="modal-close" onClick={() => setShowEditStallModal(false)}>✕</button>
+            </div>
+            <form className="modal-form" onSubmit={handleUpdateStall}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Stall Picture</label>
+                  <div className="image-upload-container">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleStallPictureSelect}
+                      className="image-upload-input"
+                      id="edit-stall-picture"
+                    />
+                    <label htmlFor="edit-stall-picture" className="image-upload-label">
+                      <i className="fas fa-cloud-upload-alt"></i>
+                      <span>Change Picture</span>
+                    </label>
+                    {stallPicturePreview && (
+                      <div className="image-preview">
+                        <img src={stallPicturePreview} alt="Stall preview" />
+                        <button
+                          type="button"
+                          className="image-remove"
+                          onClick={() => { setStallPictureFile(null); setStallPicturePreview(null); }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Stall Description</label>
+                  <textarea
+                    value={stallForm.stallDescription}
+                    onChange={(e) => setStallForm({ ...stallForm, stallDescription: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Opening Time</label>
+                    <input
+                      type="time"
+                      value={stallForm.openTime}
+                      onChange={(e) => setStallForm({ ...stallForm, openTime: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Closing Time</label>
+                    <input
+                      type="time"
+                      value={stallForm.closingTime}
+                      onChange={(e) => setStallForm({ ...stallForm, closingTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-section-title">Payment Methods</div>
+
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={stallForm.cashAvailable}
+                      onChange={(e) => setStallForm({ ...stallForm, cashAvailable: e.target.checked })}
+                    />
+                    Cash
+                  </label>
+                </div>
+
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={stallForm.gcashAvailable}
+                      onChange={(e) => setStallForm({ ...stallForm, gcashAvailable: e.target.checked })}
+                    />
+                    GCash
+                  </label>
+                </div>
+                {stallForm.gcashAvailable && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>GCash Account Name</label>
+                      <input
+                        type="text"
+                        value={stallForm.gcashAccountName}
+                        onChange={(e) => setStallForm({ ...stallForm, gcashAccountName: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>GCash Phone Number</label>
+                      <input
+                        type="tel"
+                        value={stallForm.gcashPhoneNumber}
+                        onChange={(e) => setStallForm({ ...stallForm, gcashPhoneNumber: e.target.value })}
+                        placeholder="11-digit number"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={stallForm.paymayaAvailable}
+                      onChange={(e) => setStallForm({ ...stallForm, paymayaAvailable: e.target.checked })}
+                    />
+                    Maya
+                  </label>
+                </div>
+                {stallForm.paymayaAvailable && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Maya Account Name</label>
+                      <input
+                        type="text"
+                        value={stallForm.paymayaAccountName}
+                        onChange={(e) => setStallForm({ ...stallForm, paymayaAccountName: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Maya Phone Number</label>
+                      <input
+                        type="tel"
+                        value={stallForm.paymayaPhoneNumber}
+                        onChange={(e) => setStallForm({ ...stallForm, paymayaPhoneNumber: e.target.value })}
+                        placeholder="11-digit number"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn-secondary" onClick={() => setShowEditStallModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={isSubmittingStall}>
+                  {isSubmittingStall ? "Saving…" : "Save Changes"}
                 </button>
               </div>
             </form>
