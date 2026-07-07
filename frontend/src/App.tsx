@@ -6,6 +6,7 @@ import { Product } from "./pages/Product";
 import { Cart } from "./pages/Cart";
 import Preorder from "./pages/PreOrder";
 import { Profile } from "./pages/Profile";
+import { StudentOrders } from "./pages/Orders";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { AdminStalls } from "./pages/AdminStalls";
 import { AdminVendors } from "./pages/AdminVendors";
@@ -203,6 +204,8 @@ function App() {
         return <Preorder token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} preorderData={pageData} />;
       case "profile":
         return <Profile token={token || ""} userId={user?.id || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
+      case "orders":
+        return <StudentOrders token={token || ""} onNavigate={navigateTo} onLogout={handleLogout} />;
       case "about":
         return <AboutUs onNavigate={navigateTo} token={token} onLogout={handleLogout} />;
       case "trends":

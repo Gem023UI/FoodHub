@@ -29,6 +29,7 @@ export function Header({ onNavigate, token, onLogout, cartCount = 0, currentPage
   const navLinks = [
     { id: "home", label: "Home", icon: null },
     { id: "stalls", label: "Stalls", icon: null },
+    ...(token ? [{ id: "orders", label: "Orders", icon: null }] : []),
     { id: "trends", label: "Trends", icon: null },
     { id: "about", label: "About", icon: null },
   ];
