@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
 import Lanyard from "../components/Lanyard";
 import Loader from "../components/Loader";
-import bgImage from "../../images/background_UI.jpg";
+import bgImage from "../../images/profile background.png";
 import "../styles/AdminProfile.css";
 
 interface AdminProfileData {

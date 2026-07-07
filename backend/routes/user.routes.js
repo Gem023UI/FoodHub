@@ -110,11 +110,14 @@ usersRouter.patch("/:userId", auth_1.authenticateRequest, async (request, respon
             const isAdmin = request.role === "admin";
             updated = await (0, user_controller_1.updateStudent)(userId, updates, isAdmin);
         } else if (request.role === "vendor") {
-            const student = await models_1.StudentModel.findById(userId).select("email");
-            if (student) {
-                const isAdmin = request.role === "admin";
-                updated = await (0, user_controller_1.updateVendor)(student.email, updates, isAdmin);
+            const allowedVendorFields = ["contactNumber", "profilePictureUrl"];
+            const sanitized = {};
+            for (const f of allowedVendorFields) {
+                if (f in updates) sanitized[f] = updates[f];
             }
+            updated = await models_1.VendorModel.findByIdAndUpdate(userId, { $set: sanitized }, { new: true })
+                .select("-passwordHash")
+                .lean();
         } else if (request.role === "admin") {
             updated = await (0, user_controller_1.updateAdmin)(userId, updates);
         }

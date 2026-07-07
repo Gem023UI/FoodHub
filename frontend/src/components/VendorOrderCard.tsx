@@ -19,6 +19,12 @@ export function VendorOrderCard({ order, onUpdateOrderStatus, onUpdatePaymentSta
   const hasProof = order.paymentMethod === "gcash" || order.paymentMethod === "paymaya";
   const paymentIsPending = (order.paymentRecord?.status || "pending") === "pending";
 
+  const paymentMethodLabel: Record<Order["paymentMethod"], string> = {
+    cash: "💵 Cash",
+    gcash: "📱 GCash",
+    paymaya: "📱 Maya"
+  };
+
   const getStatusColor = (status: Order["orderStatus"]) => {
     switch (status) {
       case "pending": return "status-pending";
@@ -79,6 +85,10 @@ export function VendorOrderCard({ order, onUpdateOrderStatus, onUpdatePaymentSta
         <div className="voc-actions-left">
           <span className={`order-status-badge ${getStatusColor(order.orderStatus)}`}>
             {order.orderStatus.charAt(0).toUpperCase() + order.orderStatus.slice(1)}
+          </span>
+
+          <span className="voc-payment-method-badge">
+            {paymentMethodLabel[order.paymentMethod]}
           </span>
 
           <select

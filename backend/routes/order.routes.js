@@ -250,7 +250,7 @@ orderRouter.patch("/:orderId/status", auth_1.authenticateRequest, (0, auth_1.aut
 });
 
 // ── UPDATE PAYMENT STATUS ──────────────────────────────────────────────────
-orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (request, response) => {
+orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, (0, auth_1.authorizeRoles)("vendor"), async (request, response) => {
     const orderId = firstParam(request.params.orderId);
     const { paymentStatus, paymentData } = request.body;
 
@@ -273,31 +273,14 @@ orderRouter.patch("/:orderId/payment", auth_1.authenticateRequest, async (reques
             return response.status(404).json({ message: "Order not found." });
         }
 
-        const isStudent = order.studentId._id.toString() === request.userId;
-        const isAdmin = request.role === "admin";
-        
-        let isVendor = false;
-        if (request.role === "vendor") {
-            const stall = await (0, stall_controller_1.getStallByVendorAuthId)(request.userId);
-            if (stall && stall._id.toString() === order.stallId._id.toString()) {
-                isVendor = true;
-            }
+        const vendorAuthId = request.userId;
+        const stall = await (0, stall_controller_1.getStallByVendorAuthId)(vendorAuthId);
+        if (!stall || stall._id.toString() !== order.stallId._id.toString()) {
+            return response.status(403).json({ message: "Unauthorized to update this order's payment." });
         }
 
-        if (!isStudent && !isVendor && !isAdmin) {
-            return response.status(403).json({ message: "Unauthorized to update payment." });
-        }
+        const result = await (0, order_controller_1.updatePaymentStatus)(orderId, paymentStatus.toLowerCase(), paymentData);
 
-        if (paymentStatus === "paid" && !isStudent && !isVendor && !isAdmin) {
-            return response.status(403).json({ message: "Not authorized to mark payment as paid." });
-        }
-
-        if (paymentStatus === "refunded" && !isVendor && !isAdmin) {
-            return response.status(403).json({ message: "Only vendors or admins can refund payments." });
-        }
-
-        const result = await (0, order_controller_1.updateOrderStatus)(orderId, status.toLowerCase(), vendorAuthId);
-        
         if (!result.success) {
             response.status(400).json({ 
                 message: "Failed to update payment status." 

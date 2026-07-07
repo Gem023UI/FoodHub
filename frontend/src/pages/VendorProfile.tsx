@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Footer } from "../components/Footer";
+import Lanyard from "../components/Lanyard";
 import Loader from "../components/Loader";
+import bgImage from "../../images/profile background.png";
 import "../styles/VendorProfile.css";
 
 interface VendorProfileData {
@@ -18,6 +20,7 @@ interface VendorProfileData {
     stallName: string;
     section: number;
   } | string;
+  stallName?: string;
   createdAt: string;
 }
 
@@ -28,6 +31,9 @@ interface VendorProfileProps {
   onLogout?: () => void;
   onProfileUpdate?: (name: string, profilePicUrl: string | null) => void;
 }
+
+// ── API Base URL ────────────────────────────────────────────────────────
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export function VendorProfile({
   token,
@@ -57,7 +63,7 @@ export function VendorProfile({
   async function loadProfile() {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/users/me`, {
+      const response = await fetch(`${apiBaseUrl}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to load profile");
@@ -88,23 +94,28 @@ export function VendorProfile({
     setIsSaving(true);
     setError(null);
     try {
-      // TODO: swap for a real vendor picture-upload endpoint once available
       let profilePictureUrl = profile.profilePictureUrl ?? null;
+
       if (editPictureFile) {
         const formData = new FormData();
-        formData.append("picture", editPictureFile);
-        const uploadRes = await fetch(`/api/vendors/${userId}/picture`, {
+        formData.append("profile", editPictureFile);
+
+        const uploadRes = await fetch(`${apiBaseUrl}/users/profile/vendor`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
+
         if (uploadRes.ok) {
           const uploaded = await uploadRes.json();
           profilePictureUrl = uploaded.url ?? profilePictureUrl;
+        } else {
+          const errorData = await uploadRes.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to upload picture");
         }
       }
 
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(`${apiBaseUrl}/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ contactNumber: editContact, profilePictureUrl }),
@@ -135,8 +146,7 @@ export function VendorProfile({
     setIsDeactivating(true);
     setError(null);
     try {
-      // TODO: wire to real deactivate endpoint, e.g. PATCH /api/vendors/:id/deactivate
-      await fetch(`/api/vendors/${userId}/deactivate`, {
+      await fetch(`${apiBaseUrl}/vendors/${userId}/deactivate`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -173,16 +183,20 @@ export function VendorProfile({
   }
 
   const displayName = `${profile.firstName} ${profile.lastName}`;
-  const stallName = typeof profile.stallId === "object" ? profile.stallId.stallName : "No stall assigned";
-  const stallSection = typeof profile.stallId === "object" ? profile.stallId.section : null;
+  const stallName =
+    typeof profile.stallId === "object" && profile.stallId
+      ? profile.stallId.stallName
+      : profile.stallName || "No stall assigned";
+  const stallSection =
+    typeof profile.stallId === "object" && profile.stallId ? profile.stallId.section : null;
 
   return (
     <div className="vendor-profile-page">
       {error && <div className="alert alert-error vp-alert">{error}</div>}
       {successMsg && <div className="alert alert-success vp-alert">{successMsg}</div>}
 
-      {/* ══════════════════════════ SECTION 1 — Vendor Info (only section shown) ══════════════════════════ */}
-      <section className="vp-hero">
+      {/* ══════════════════════════ SECTION 1 — Vendor Info ══════════════════════════ */}
+      <section className="vp-hero" style={{ backgroundImage: `url(${bgImage})` }}>
         <div className="vp-hero-overlay" />
         <div className="vp-hero-content">
           <div className="vp-hero-text">
@@ -191,6 +205,9 @@ export function VendorProfile({
             <p className="vp-hero-meta">
               {stallName}{stallSection ? ` — Section ${stallSection}` : ""} &nbsp; {profile.position || "Vendor"}
             </p>
+            <p className="vp-hero-contact">
+              {profile.contactNumber || "No contact number set"}
+            </p>
             <p className="vp-hero-email">{profile.email}</p>
             <div className="vp-hero-actions">
               <button className="vp-btn vp-btn-yellow" onClick={() => setShowEditModal(true)}>EDIT PROFILE</button>
@@ -198,30 +215,12 @@ export function VendorProfile({
             </div>
           </div>
 
-          {/* Stylized 3D lanyard placeholder — swap for a real 3D model later */}
           <div className="vp-lanyard-wrap">
-            <svg className="vp-lanyard-straps" viewBox="0 0 200 120" preserveAspectRatio="none">
-              <path d="M60 0 L100 90 L140 0" fill="none" stroke="#f5c518" strokeWidth="14" strokeLinecap="round" />
-            </svg>
-            <div className="vp-lanyard-card">
-              <div className="vp-lanyard-card-notch" />
-              <div
-                className="vp-lanyard-photo"
-                style={profile.profilePictureUrl ? {
-                  backgroundImage: `url(${profile.profilePictureUrl})`, backgroundSize: "cover", backgroundPosition: "center"
-                } : {}}
-              >
-                {!profile.profilePictureUrl && <span>{displayName.charAt(0).toUpperCase()}</span>}
-              </div>
-              <div className="vp-lanyard-line vp-lanyard-line-name" />
-              <div className="vp-lanyard-line" />
-              <div className="vp-lanyard-line short" />
-              {profile.status && (
-                <div className={`vp-status-badge ${profile.status === "verified" ? "active" : "inactive"}`}>
-                  {profile.status}
-                </div>
-              )}
-            </div>
+            <Lanyard
+              key={profile.profilePictureUrl || "default"}
+              frontImage={profile.profilePictureUrl || null}
+              imageFit="cover"
+            />
           </div>
         </div>
       </section>

@@ -292,3 +292,13 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.voc-payment-method-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+  background: #f0f0f0;
+  color: #444;
+}

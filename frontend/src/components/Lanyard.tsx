@@ -68,6 +68,38 @@ export default function Lanyard({
 }: LanyardProps) {
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
+  // ── Verify images actually load before handing them to useTexture ──
+  // useTexture throws (uncaught) on failed loads, crashing the whole canvas.
+  // Pre-checking with a plain Image() lets us fall back safely instead.
+  const [safeFrontImage, setSafeFrontImage] = useState<string | null>(null);
+  const [safeBackImage, setSafeBackImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!frontImage) {
+      setSafeFrontImage(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => { if (!cancelled) setSafeFrontImage(frontImage); };
+    img.onerror = () => { if (!cancelled) setSafeFrontImage(null); };
+    img.src = frontImage;
+    return () => { cancelled = true; };
+  }, [frontImage]);
+
+  useEffect(() => {
+    if (!backImage) {
+      setSafeBackImage(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => { if (!cancelled) setSafeBackImage(backImage); };
+    img.onerror = () => { if (!cancelled) setSafeBackImage(null); };
+    img.src = backImage;
+    return () => { cancelled = true; };
+  }, [backImage]);
+
   useEffect(() => {
     const handleResize = (): void => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
@@ -86,8 +118,8 @@ export default function Lanyard({
         <Physics gravity={gravity} timeStep={isMobile ? 1 / 30 : 1 / 60}>
           <Band
             isMobile={isMobile}
-            frontImage={frontImage}
-            backImage={backImage}
+            frontImage={safeFrontImage}
+            backImage={safeBackImage}
             imageFit={imageFit}
             lanyardImage={lanyardImage}
             lanyardWidth={lanyardWidth}
@@ -194,46 +226,59 @@ function Band({
     const baseMap = materials.base.map as THREE.Texture;
     if (!frontImage && !backImage) return baseMap;
 
-    const baseImg = baseMap.image as any;
-    const W = baseImg.width;
-    const H = baseImg.height;
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return baseMap;
-    // Keep the original baked atlas for the card edges and any untouched face.
-    ctx.drawImage(baseImg, 0, 0, W, H);
+    try {
+      const baseImg = baseMap.image as any;
+      const W = baseImg.width;
+      const H = baseImg.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return baseMap;
+      ctx.drawImage(baseImg, 0, 0, W, H);
 
-    const drawFitted = (img: any, rect: typeof FRONT_UV_RECT) => {
-      const rx = rect.x * W;
-      const ry = rect.y * H;
-      const rw = rect.w * W;
-      const rh = rect.h * H;
-      const pick = imageFit === 'contain' ? Math.min : Math.max;
-      const scale = pick(rw / img.width, rh / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
-      const dx = rx + (rw - dw) / 2;
-      const dy = ry + (rh - dh) / 2;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(rx, ry, rw, rh);
-      ctx.clip();
-      ctx.drawImage(img, dx, dy, dw, dh);
-      ctx.restore();
-    };
+      const isImageReady = (img: any) =>
+        img &&
+        img.complete !== false &&
+        (img.naturalWidth ?? img.width) > 0 &&
+        (img.naturalHeight ?? img.height) > 0;
 
-    if (frontImage && frontTex.image) drawFitted(frontTex.image, FRONT_UV_RECT);
-    if (backImage && backTex.image) drawFitted(backTex.image, BACK_UV_RECT);
+      const drawFitted = (img: any, rect: typeof FRONT_UV_RECT) => {
+        if (!isImageReady(img)) return;
+        const rx = rect.x * W;
+        const ry = rect.y * H;
+        const rw = rect.w * W;
+        const rh = rect.h * H;
+        const pick = imageFit === 'contain' ? Math.min : Math.max;
+        const scale = pick(rw / img.width, rh / img.height);
+        if (!Number.isFinite(scale) || scale <= 0) return;
+        const dw = img.width * scale;
+        const dh = img.height * scale;
+        const dx = rx + (rw - dw) / 2;
+        const dy = ry + (rh - dh) / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(rx, ry, rw, rh);
+        ctx.clip();
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.restore();
+      };
 
-    const composite = new THREE.CanvasTexture(canvas);
-    composite.colorSpace = THREE.SRGBColorSpace;
-    composite.flipY = baseMap.flipY;
-    composite.anisotropy = 16;
-    composite.needsUpdate = true;
-    return composite;
+      if (frontImage && frontTex.image) drawFitted(frontTex.image, FRONT_UV_RECT);
+      if (backImage && backTex.image) drawFitted(backTex.image, BACK_UV_RECT);
+
+      const composite = new THREE.CanvasTexture(canvas);
+      composite.colorSpace = THREE.SRGBColorSpace;
+      composite.flipY = baseMap.flipY;
+      composite.anisotropy = 16;
+      composite.needsUpdate = true;
+      return composite;
+    } catch (err) {
+      console.error('Lanyard: failed to composite card texture, falling back to default.', err);
+      return baseMap;
+    }
   }, [frontImage, backImage, imageFit, frontTex, backTex, materials.base.map]);
+
   const [curve] = useState(
     () =>
       new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()])
