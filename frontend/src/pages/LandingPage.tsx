@@ -111,6 +111,14 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
         }
         filtered = filtered.filter(p => p.price >= priceRange.min && p.price <= priceRange.max);
         setSearchResults(filtered);
+
+        // On mobile, scroll the results into view since the section can grow
+        // well past the initial viewport once results render.
+        if (typeof window !== "undefined" && window.innerWidth <= 600) {
+            requestAnimationFrame(() => {
+                document.getElementById("search-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        }
     }
 
     function handlePriceChange(type: "min" | "max", value: string) {
@@ -134,6 +142,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                             src={heroImages[currentSlide]}
                             alt="FoodHub"
                             className={`lp-hero-food-img lp-slide ${animating ? "lp-slide-exit" : "lp-slide-enter"}`}
+                            loading="eager"
                         />
                     </div>
                 </div>
@@ -235,6 +244,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                                 <i className="fas fa-search search-icon"></i>
                                 <input
                                     type="text"
+                                    inputMode="search"
                                     placeholder="Search for food, stall, or category..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -245,6 +255,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                             <div className="lp-price-inputs">
                                 <input
                                     type="number"
+                                    inputMode="decimal"
                                     placeholder="Min"
                                     value={priceRange.min || ""}
                                     onChange={(e) => handlePriceChange("min", e.target.value)}
@@ -254,6 +265,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                                 <span className="lp-price-separator">-</span>
                                 <input
                                     type="number"
+                                    inputMode="decimal"
                                     placeholder="Max"
                                     value={priceRange.max || ""}
                                     onChange={(e) => handlePriceChange("max", e.target.value)}
@@ -334,7 +346,7 @@ export function LandingPage({ onNavigate, token, onLogout }: LandingPageProps) {
                     </button>
                 </div>
                 <div className="lp-promo-card">
-                    <img src={tupLogo} alt="Promo" className="lp-promo-img" />
+                    <img src={tupLogo} alt="Promo" className="lp-promo-img" loading="lazy" />
                     <h3 className="lp-promo-title">Today's Special</h3>
                     <p className="lp-promo-sub">
                         Fresh meals every day at TUP Canteen. Check the latest promos from your

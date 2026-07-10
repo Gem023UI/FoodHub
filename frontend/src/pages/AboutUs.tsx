@@ -55,6 +55,9 @@ export function AboutUs({ onNavigate, token, onLogout }: AboutUsProps) {
               <div className="credit-card">
                 <h3>Developer</h3>
                 <p className="credit-name">Aia A. Garcia</p>
+                <p className="credit-name">Janella A. Yumang</p>
+                <p className="credit-name">Jemuel A. Malaga</p>
+                <p className="credit-name">Matthew A. Hernandez</p>
                 <p className="credit-details">BSIT-S-T-3A-T</p>
                 <p className="credit-school">Technological University of the Philippines - Taguig</p>
               </div>

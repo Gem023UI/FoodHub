@@ -3,6 +3,7 @@
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
+  overflow-x: hidden;
 }
 
 .trends-container {
@@ -11,6 +12,7 @@
   padding: 32px 20px;
   flex: 1;
   width: 100%;
+  box-sizing: border-box;
 }
 
 /* ─── HEADER ──────────────────────────────────────────────────────────── */
@@ -32,6 +34,8 @@
   transition: all 0.2s;
   font-weight: 500;
   margin-bottom: 16px;
+  min-height: 40px;
+  touch-action: manipulation;
 }
 
 .trends-header .btn-back:hover {
@@ -50,7 +54,7 @@
 .trends-header h1 {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 900;
-  font-size: 36px;
+  font-size: clamp(24px, 5vw, 36px);
   color: #1a1a1a;
   margin: 0;
 }
@@ -114,6 +118,8 @@
   cursor: pointer;
   transition: all 0.2s;
   font-family: 'Poppins', sans-serif;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 .tab-btn i {
@@ -167,6 +173,7 @@
   background: #fafaf8;
   cursor: pointer;
   transition: border-color 0.2s;
+  min-height: 44px;
 }
 
 .trend-course-select:focus {
@@ -203,6 +210,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 .period-btn:hover {
@@ -344,6 +353,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-favs {
@@ -352,6 +365,7 @@
   gap: 4px;
   color: #ff3131;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .item-view-btn {
@@ -366,6 +380,8 @@
   cursor: pointer;
   transition: all 0.2s;
   font-family: 'Poppins', sans-serif;
+  min-height: 32px;
+  touch-action: manipulation;
 }
 
 .item-view-btn:hover {
@@ -427,10 +443,6 @@
     align-items: flex-start;
   }
 
-  .trends-header h1 {
-    font-size: 28px;
-  }
-
   .trends-stats {
     width: 100%;
     justify-content: space-around;
@@ -453,20 +465,33 @@
   .course-selector {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
+  }
+
+  .trend-course-select {
+    width: 100%;
+    font-size: 16px; /* prevents iOS auto-zoom on focus */
+  }
+
+  .trend-summary {
+    text-align: center;
   }
 
   .period-selector {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    width: 100%;
   }
 
   .period-btn {
-    flex: 1;
     justify-content: center;
-    min-width: 60px;
+    width: 100%;
   }
 
   .trend-categories-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .trend-item-card {
@@ -479,14 +504,11 @@
 }
 
 @media (max-width: 480px) {
-  .trends-header h1 {
-    font-size: 24px;
-  }
-
   .trends-stats {
     flex-direction: column;
     gap: 8px;
     align-items: center;
+    width: 100%;
   }
 
   .stat-item {
@@ -499,11 +521,64 @@
     padding: 12px 16px;
   }
 
+  .period-icon {
+    font-size: 22px;
+  }
+
   .category-header {
     padding: 12px 16px;
   }
 
+  .category-icon {
+    font-size: 22px;
+  }
+
+  .category-info h3 {
+    font-size: 15px;
+  }
+
   .category-items {
     padding: 8px 12px 12px;
+  }
+
+  .item-name {
+    font-size: 13px;
+  }
+
+  .item-meta {
+    gap: 8px;
+  }
+}
+
+/* ─── EXTRA SMALL PHONES (≤ 380px) ──────────────────────────────────────
+   Below this width the rank badge + item name + view button start
+   competing for space in a single row, so stack the view button
+   underneath the item content instead of squeezing everything sideways. */
+@media (max-width: 380px) {
+  .trends-header .btn-back {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .trend-item-card {
+    flex-wrap: wrap;
+  }
+
+  .item-content {
+    flex-basis: calc(100% - 44px);
+  }
+
+  .item-view-btn {
+    margin-left: 44px;
+    margin-top: 6px;
+  }
+
+  .item-meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .period-selector {
+    grid-template-columns: 1fr;
   }
 }

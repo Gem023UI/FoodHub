@@ -3,12 +3,15 @@
    Sections: Hero (student info) / Favorites / Budget / Orders / Nutrition
    ══════════════════════════════════════════════════════════════════════ */
 
+*, *::before, *::after { box-sizing: border-box; }
+
 .profile-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background: #f7f7f5;
   font-family: "Poppins", "Segoe UI", sans-serif;
+  overflow-x: hidden;
 }
 
 .profile-loading,
@@ -40,7 +43,7 @@
 .pf-section-title {
   color: #fff;
   font-weight: 800;
-  font-size: 26px;
+  font-size: clamp(20px, 3.5vw, 26px);
   margin: 0 0 24px;
 }
 
@@ -56,6 +59,8 @@
   letter-spacing: 0.03em;
   cursor: pointer;
   transition: transform 0.15s ease, opacity 0.15s ease;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 .pf-btn:hover { transform: translateY(-1px); }
 .pf-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
@@ -102,10 +107,10 @@
 
 .pf-hero-text { max-width: 540px; }
 .pf-hero-welcome { color: #fff; font-size: 18px; margin: 0; opacity: 0.9; }
-.pf-hero-name { color: #fff; font-size: 48px; font-weight: 900; margin: 2px 0 10px; line-height: 1.05; }
+.pf-hero-name { color: #fff; font-size: clamp(28px, 6vw, 48px); font-weight: 900; margin: 2px 0 10px; line-height: 1.05; }
 .pf-hero-meta { color: #ffe08a; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; margin: 0 0 4px; }
 .pf-hero-email { color: #fff; font-size: 14px; opacity: 0.85; margin: 0 0 20px; }
-.pf-hero-actions { display: flex; gap: 14px; }
+.pf-hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
 
 /* Lanyard — stylized CSS/SVG placeholder for a future 3D model */
 .lanyard-wrap {
@@ -123,7 +128,7 @@
 
 /* ─────────────────────────── SECTION 2 — Favorites ─────────────────────────── */
 .pf-favorites { background: #ffffff; }
-.pf-favorites-title { color: #ff3131; font-weight: 900; font-size: 30px; margin: 0 0 24px; }
+.pf-favorites-title { color: #ff3131; font-weight: 900; font-size: clamp(22px, 4vw, 30px); margin: 0 0 24px; }
 
 .pf-favorites-scroll {
   display: flex;
@@ -131,9 +136,11 @@
   overflow-x: auto;
   padding-bottom: 10px;
   scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 .pf-favorites-scroll::-webkit-scrollbar { height: 8px; }
 .pf-favorites-scroll::-webkit-scrollbar-thumb { background: #ddd; border-radius: 8px; }
+.pf-favorites-scroll > * { flex-shrink: 0; scroll-snap-align: start; }
 
 /* ─────────────────────────── SECTION 3 — Budget ─────────────────────────── */
 .pf-budget { background: #ffc700; }
@@ -161,18 +168,21 @@
   font-size: 13px;
   letter-spacing: 0.05em;
   margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 
 .pf-budget-numbers {
   display: flex;
   gap: 32px;
   margin-bottom: 22px;
+  flex-wrap: wrap;
+  row-gap: 14px;
 }
 .pf-budget-numbers strong { display: block; font-size: 34px; font-weight: 900; }
 .pf-budget-numbers label { display: block; font-size: 11px; font-weight: 700; opacity: 0.9; }
 
 .pf-budget-remaining-label { margin: 0; font-size: 13px; opacity: 0.9; }
-.pf-budget-remaining-value { margin: 2px 0 20px; font-size: 34px; font-weight: 900; }
+.pf-budget-remaining-value { margin: 2px 0 20px; font-size: clamp(26px, 5vw, 34px); font-weight: 900; }
 
 /* ─────────────────────────── SECTION 4 — Orders ─────────────────────────── */
 .pf-orders { background: #ff6a1f; }
@@ -184,6 +194,8 @@
   justify-content: space-between;
   position: relative;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .pf-date-pill {
@@ -198,6 +210,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 40px;
+  touch-action: manipulation;
+  white-space: nowrap;
 }
 
 .pf-date-pill-menu {
@@ -216,6 +231,7 @@
   color: #333;
 }
 .pf-date-pill-menu label { display: flex; flex-direction: column; gap: 4px; }
+.pf-date-pill-menu input { font-size: 16px; padding: 6px; } /* 16px prevents iOS zoom */
 
 .pf-orders-list { display: flex; flex-direction: column; gap: 14px; }
 
@@ -245,8 +261,9 @@
   justify-content: center;
   font-size: 15px;
   border: none;
+  flex-shrink: 0;
 }
-.pf-order-icon-btn { cursor: pointer; }
+.pf-order-icon-btn { cursor: pointer; touch-action: manipulation; }
 
 /* ─────────────────────────── SECTION 5 — Nutrition ─────────────────────────── */
 .pf-nutrition { background: #ff3131; }
@@ -272,6 +289,7 @@
   font-weight: 700;
   color: #333;
   margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 .pf-nutrition-legend span { display: flex; align-items: center; gap: 6px; }
 .pf-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
@@ -285,9 +303,10 @@
   font-size: 13px;
   letter-spacing: 0.05em;
   margin-bottom: 18px;
+  flex-wrap: wrap;
 }
 
-.pf-nutrition-numbers { display: flex; gap: 32px; margin-bottom: 20px; }
+.pf-nutrition-numbers { display: flex; gap: 32px; margin-bottom: 20px; flex-wrap: wrap; row-gap: 14px; }
 .pf-nutrition-numbers strong { display: block; font-size: 30px; font-weight: 900; }
 .pf-nutrition-numbers label { display: block; font-size: 11px; font-weight: 700; opacity: 0.9; }
 
@@ -305,6 +324,8 @@
   font-size: 12px;
   cursor: pointer;
   text-transform: capitalize;
+  min-height: 32px;
+  touch-action: manipulation;
 }
 .range-dropdown-menu {
   position: absolute;
@@ -329,6 +350,7 @@
   text-transform: capitalize;
   color: #333;
   cursor: pointer;
+  min-height: 40px;
 }
 .range-dropdown-item:hover { background: #f2f2f2; }
 .range-dropdown-item.active { font-weight: 800; color: #ff3131; }
@@ -376,13 +398,14 @@
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 9px 12px;
-  font-size: 14px;
+  font-size: 16px; /* prevents iOS auto-zoom on focus */
 }
 .pf-modal-danger p { color: #444; font-size: 14px; line-height: 1.5; }
-.pf-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.pf-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .pf-modal-actions .pf-btn-white-outline { color: #444; border-color: #ccc; }
+.pf-modal-actions .pf-btn { flex: 1 1 auto; min-width: 110px; }
 
-.pf-modal-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.pf-modal-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .pf-modal-avatar {
   width: 64px;
   height: 64px;
@@ -393,10 +416,16 @@
   justify-content: center;
   color: #999;
   font-size: 22px;
+  flex-shrink: 0;
 }
 
 .pf-star-row { display: flex; gap: 6px; font-size: 22px; color: #ddd; }
-.pf-star-row .fa-star { cursor: pointer; }
+.pf-star-row .fa-star {
+  cursor: pointer;
+  padding: 8px;
+  margin: -8px;
+  touch-action: manipulation;
+}
 .pf-star-active { color: #ffc700; }
 .pf-hint { font-size: 12px; color: #777; margin: 4px 0 0; }
 
@@ -408,6 +437,7 @@
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
+  min-height: 36px;
 }
 
 /* ── Budget action row (Add Next Budget Cap / Budget Cap Records) ── */
@@ -416,56 +446,6 @@
   gap: 14px;
   flex-wrap: wrap;
 }
-
-/* ── Budget Cap Records panel (expands the section when toggled open) ── */
-.pf-budget-records {
-  margin-top: 32px;
-  background: #f4efe3;
-  border-radius: 16px;
-  padding: 24px;
-}
-
-.pf-budget-records-title {
-  color: #1a1a1a;
-  font-weight: 800;
-  font-size: 18px;
-  margin: 0 0 16px;
-}
-
-.pf-budget-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.pf-budget-table th {
-  text-align: left;
-  color: #8a6a4a;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 0 12px 10px;
-  border-bottom: 2px solid rgba(138, 106, 74, 0.25);
-}
-
-.pf-budget-table td {
-  padding: 14px 12px;
-  color: #1a1a1a;
-  font-weight: 600;
-  border-bottom: 1px solid rgba(138, 106, 74, 0.15);
-}
-
-.pf-budget-table tbody tr:last-child td { border-bottom: none; }
-.pf-budget-table tbody tr:hover { background: rgba(255, 199, 0, 0.12); }
-
-.pf-budget-status {
-  text-transform: capitalize;
-  font-weight: 800;
-}
-.pf-budget-status-active { color: #1a8f3c; }
-.pf-budget-status-accomplished { color: #2b6cb0; }
-.pf-budget-status-failed { color: #ff3131; }
 
 /* ── Small icon button (delete, in records table) ── */
 .pf-btn-icon {
@@ -479,34 +459,11 @@
   cursor: pointer;
   font-size: 13px;
   transition: transform 0.15s ease, opacity 0.15s ease;
+  touch-action: manipulation;
 }
 .pf-btn-icon:hover { transform: translateY(-1px); }
 .pf-btn-icon:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .pf-btn-icon-red { background: #ff3131; color: #fff; }
-
-/* ─────────────────────────── Responsive ─────────────────────────── */
-@media (max-width: 900px) {
-  .pf-hero-content { flex-direction: column; align-items: flex-start; }
-  .pf-budget-grid, .pf-nutrition-grid { grid-template-columns: 1fr; }
-  .pf-order-row { grid-template-columns: 1fr 1fr; row-gap: 10px; }
-  .pf-order-icons { grid-column: span 2; justify-self: start; }
-  .pf-budget-table { font-size: 13px; }
-  .pf-budget-table th:nth-child(3),
-  .pf-budget-table td:nth-child(3) { display: none; }
-  .lanyard-wrap { width: 100%; height: 420px; }
-  .pf-hero { min-height: 780px; }
-}
-
-@media (max-width: 560px) {
-  .pf-section { padding: 36px 5vw; }
-  .pf-hero-name { font-size: 34px; }
-  .pf-order-row { grid-template-columns: 1fr; }
-  .pf-budget-records { padding: 16px; overflow-x: auto; }
-  .pf-budget-table { min-width: 480px; }
-  .pf-budget-table th:nth-child(3),
-  .pf-budget-table td:nth-child(3) { display: table-cell; }
-  .lanyard-wrap { height: 340px; }
-}
 
 /* ── Smooth expand/collapse for Budget Cap Records ── */
 .pf-budget-records-wrap {
@@ -534,6 +491,50 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+.pf-budget-records-title {
+  color: #1a1a1a;
+  font-weight: 800;
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+
+.pf-budget-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.pf-budget-table th {
+  text-align: left;
+  color: #8a6a4a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0 12px 10px;
+  border-bottom: 2px solid rgba(138, 106, 74, 0.25);
+  white-space: nowrap;
+}
+
+.pf-budget-table td {
+  padding: 14px 12px;
+  color: #1a1a1a;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(138, 106, 74, 0.15);
+  white-space: nowrap;
+}
+
+.pf-budget-table tbody tr:last-child td { border-bottom: none; }
+.pf-budget-table tbody tr:hover { background: rgba(255, 199, 0, 0.12); }
+
+.pf-budget-status {
+  text-transform: capitalize;
+  font-weight: 800;
+}
+.pf-budget-status-active { color: #1a8f3c; }
+.pf-budget-status-accomplished { color: #2b6cb0; }
+.pf-budget-status-failed { color: #ff3131; }
 
 /* ── Surplus column ── */
 .pf-budget-table .fa-clock { color: #b8860b; font-size: 16px; }
@@ -574,3 +575,92 @@
 .review-photos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .review-photos img { width: 80px; height: 80px; border-radius: 8px; object-fit: cover; border: 1px solid #f0f0f0; }
 .review-date { font-size: 12px; color: #a6a6a6; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RESPONSIVE — TABLET (≤ 900px)
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .pf-section { padding: 40px 5vw; }
+
+  .pf-hero { min-height: 780px; padding: 0 5vw; }
+  .pf-hero-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 40px 0;
+    gap: 24px;
+  }
+
+  /* Requested order: Lanyard first, student info below it on mobile/stacked layout */
+  .lanyard-wrap { order: -1; width: 100%; height: 420px; }
+  .pf-hero-text { order: 0; max-width: 100%; }
+
+  .pf-hero-actions { justify-content: center; }
+
+  .pf-budget-grid, .pf-nutrition-grid { grid-template-columns: 1fr; }
+
+  .pf-order-row { grid-template-columns: 1fr 1fr; row-gap: 10px; }
+  .pf-order-icons { grid-column: span 2; justify-self: start; }
+
+  .pf-budget-table { font-size: 13px; }
+  .pf-budget-table th:nth-child(3),
+  .pf-budget-table td:nth-child(3) { display: none; }
+
+  .pf-budget-numbers, .pf-nutrition-numbers { gap: 24px; }
+
+  .pf-date-pill-menu { left: 0; right: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RESPONSIVE — MOBILE (≤ 560px)
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 560px) {
+  .pf-section { padding: 32px 5vw; }
+
+  .lanyard-wrap { height: 320px; }
+  .pf-hero-welcome { font-size: 15px; }
+  .pf-hero-meta { font-size: 12px; }
+  .pf-hero-email { font-size: 13px; margin-bottom: 16px; }
+  .pf-hero-actions { width: 100%; flex-direction: column; }
+  .pf-hero-actions .pf-btn { width: 100%; }
+
+  .pf-favorites-scroll { gap: 12px; }
+
+  .pf-budget-numbers, .pf-nutrition-numbers { gap: 20px; justify-content: center; }
+  .pf-budget-numbers strong { font-size: 26px; }
+  .pf-nutrition-numbers strong { font-size: 24px; }
+
+  .pf-budget-actions { flex-direction: column; }
+  .pf-budget-actions .pf-btn { width: 100%; }
+
+  .pf-orders-header { flex-direction: column; align-items: flex-start; }
+  .pf-date-pill { width: 100%; justify-content: center; }
+  .pf-date-pill-menu { position: static; margin-top: 8px; box-shadow: none; border: 1px solid #f0d9c4; width: 100%; }
+
+  .pf-order-row { grid-template-columns: 1fr; padding: 16px 18px; }
+  .pf-order-icons { grid-column: 1; justify-self: start; }
+
+  .pf-nutrition-tip { max-width: 100%; }
+
+  .pf-budget-records { padding: 16px; overflow-x: auto; }
+  .pf-budget-table { min-width: 480px; }
+  .pf-budget-table th:nth-child(3),
+  .pf-budget-table td:nth-child(3) { display: table-cell; }
+
+  .pf-modal { padding: 20px; border-radius: 14px; }
+  .pf-modal-actions { flex-direction: column-reverse; }
+  .pf-modal-actions .pf-btn { width: 100%; }
+
+  .range-dropdown-menu { right: 0; left: auto; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RESPONSIVE — SMALL PHONES (≤ 400px)
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .lanyard-wrap { height: 280px; }
+  .pf-favorites-title { font-size: 22px; }
+  .pf-budget-numbers strong,
+  .pf-nutrition-numbers strong { font-size: 22px; }
+  .pf-order-number { font-size: 20px; }
+}

@@ -187,19 +187,23 @@ export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsPr
           </div>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
 
         {/* ─── TAB NAVIGATION ─── */}
-        <div className="trends-tabs">
+        <div className="trends-tabs" role="tablist">
           <button
             className={`tab-btn ${activeTab === 'course' ? 'active' : ''}`}
             onClick={() => setActiveTab('course')}
+            role="tab"
+            aria-selected={activeTab === 'course'}
           >
             <i className="fas fa-graduation-cap"></i> By Course
           </button>
           <button
             className={`tab-btn ${activeTab === 'period' ? 'active' : ''}`}
             onClick={() => setActiveTab('period')}
+            role="tab"
+            aria-selected={activeTab === 'period'}
           >
             <i className="fas fa-calendar-alt"></i> By Period
           </button>
@@ -210,8 +214,9 @@ export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsPr
           <div className="trend-tab-content">
             <div className="trend-controls">
               <div className="course-selector">
-                <label>Select Course:</label>
+                <label htmlFor="trend-course-select">Select Course:</label>
                 <select
+                  id="trend-course-select"
                   className="trend-course-select"
                   value={selectedCourse}
                   onChange={(e) => setSelectedCourse(e.target.value)}
