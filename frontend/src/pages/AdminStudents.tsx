@@ -124,7 +124,7 @@ export function AdminStudents({ token, onNavigate, onLogout }: AdminStudentsProp
       });
 
       const courseDist = await getStudentCourseDistribution(token);
-      const courseLabels = Object.keys(courseDist);
+      const courseLabels = Object.keys(courseDist).map(label => label === "Unknown" ? "Staff" : label);
       const courseValues = Object.values(courseDist) as number[];
       setCourseDistributionData({
         labels: courseLabels,
@@ -255,11 +255,11 @@ export function AdminStudents({ token, onNavigate, onLogout }: AdminStudentsProp
         <div className="analytics-section-white">
           <div className="section-header">
             <h2>Student Analytics</h2>
-            <div className="period-selector">
+            {/* <div className="period-selector">
               <button className={`period-btn ${period === 'weekly' ? 'active' : ''}`} onClick={() => setPeriod('weekly')}>Weekly</button>
               <button className={`period-btn ${period === 'monthly' ? 'active' : ''}`} onClick={() => setPeriod('monthly')}>Monthly</button>
               <button className={`period-btn ${period === 'custom' ? 'active' : ''}`} onClick={() => setPeriod('custom')}>Custom</button>
-            </div>
+            </div> */}
           </div>
 
           <div className="analytics-block">

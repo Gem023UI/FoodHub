@@ -164,15 +164,17 @@ async function logout(userId, role) {
 
 // ── REGISTER STUDENT ──────────────────────────────────────────────────
 async function registerStudent(data) {
-    const existing = await models_1.StudentModel.findOne({
-        $or: [{ email: data.email }, { tuptId: data.tuptId }]
-    });
+    const orConditions = [{ email: data.email }];
+    if (data.tuptId) {
+        orConditions.push({ tuptId: data.tuptId });
+    }
+    const existing = await models_1.StudentModel.findOne({ $or: orConditions });
 
     if (existing) {
         if (existing.email === data.email) {
             return { success: false, reason: "email_exists" };
         }
-        if (existing.tuptId === data.tuptId) {
+        if (data.tuptId && existing.tuptId === data.tuptId) {
             return { success: false, reason: "tupt_id_exists" };
         }
     }
@@ -186,9 +188,9 @@ async function registerStudent(data) {
         lastName: data.lastName,
         email: data.email,
         passwordHash: salt,
-        tuptId: data.tuptId,
-        course: data.course,
-        section: data.section,
+        tuptId: data.tuptId || null,
+        course: data.course || null,
+        section: data.section || null,
         contactNumber: data.contactNumber,
         birthdate: data.birthdate || null,
         status: "unverified",

@@ -18,7 +18,7 @@ interface VendorStallPageProps {
 const PRODUCT_CATEGORIES: ProductCategory[] = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
 const VENDOR_POSITIONS = ["Cook", "Manager", "Financier"];
 
-export function VendorStallPage({ token, onNavigate, onLogout }: VendorStallPageProps) {
+export function VendorStallPage({ token, onNavigate }: VendorStallPageProps) {
   const [stall, setStall] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);

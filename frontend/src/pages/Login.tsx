@@ -145,17 +145,10 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
     setError(null);
     setIsLoading(true);
 
-    // Validate TUPT-ID format for students
+    // Validate TUPT-ID format only if the student chose to provide one
     const tuptPattern = /^TUPT-\d{2}-\d{4}$/i;
-    if (!tuptPattern.test(tuptId)) {
+    if (tuptId && !tuptPattern.test(tuptId)) {
       setError("TUPT ID must follow the format TUPT-XX-XXXX (e.g. TUPT-21-1234).");
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate course selection
-    if (!course) {
-      setError("Please select a course.");
       setIsLoading(false);
       return;
     }
@@ -166,9 +159,9 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
         lastName,
         birthdate: birthday,
         email,
-        tuptId: tuptId.toUpperCase(),
-        course, // This should be the short code like "BSIT"
-        section,
+        tuptId: tuptId ? tuptId.toUpperCase() : undefined,
+        course: course || undefined,
+        section: section || undefined,
         contactNumber,
         password,
       });
@@ -386,7 +379,7 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
               <div className="auth-section-label">Academic info</div>
 
               <div className="auth-field">
-                <label>TUPT ID</label>
+                <label>TUPT ID (optional)</label>
                 <div className="auth-input-wrap">
                   <i className="fas fa-id-card field-icon"></i>
                   <input
@@ -395,7 +388,6 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
                     value={tuptId}
                     onChange={(e) => setTuptId(e.target.value)}
                     disabled={isLoading}
-                    required
                     pattern="TUPT-\d{2}-\d{4}"
                     title="Format: TUPT-XX-XXXX"
                   />
@@ -403,14 +395,13 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
               </div>
 
               <div className="auth-field">
-                <label>Course</label>
+                <label>Course (optional)</label>
                 <div className="auth-input-wrap">
                   <i className="fas fa-book field-icon"></i>
                   <select
                     value={course}
                     onChange={(e) => setCourse(e.target.value)}
                     disabled={isLoading}
-                    required
                   >
                     <option value="">Select course…</option>
                     {TUP_COURSES.map((c) => (
@@ -423,7 +414,7 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
               </div>
 
               <div className="auth-field">
-                <label>Section</label>
+                <label>Section (optional)</label>
                 <div className="auth-input-wrap">
                   <i className="fas fa-users field-icon"></i>
                   <input
@@ -432,7 +423,6 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
                     value={section}
                     onChange={(e) => setSection(e.target.value)}
                     disabled={isLoading}
-                    required
                   />
                 </div>
               </div>

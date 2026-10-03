@@ -34,7 +34,7 @@ export interface DetailedFavorite extends Product {
   favoritedAt: string;
 }
 
-import type { Product, ProductNutrition } from './product';
+import type { Product, ProductNutrition } from './product.service';
 
 // ── Favorite Functions ─────────────────────────────────────────────────
 export async function toggleFavorite(token: string, productId: string): Promise<{ isFavorited: boolean; favoriteCount: number }> {

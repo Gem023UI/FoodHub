@@ -42,7 +42,7 @@ export interface Stall {
   message?: string;
 }
 
-import type { Product } from '../pages/Product';
+import type { Product } from './product.service';
 
 // ── Stall Functions ────────────────────────────────────────────────────
 export async function getStalls(): Promise<Stall[]> {

@@ -7,9 +7,9 @@ export interface StudentRegisterInput {
   lastName: string;
   birthdate: string;
   email: string;
-  tuptId: string;
-  course: string;
-  section: string;
+  tuptId?: string;
+  course?: string;
+  section?: string;
   contactNumber: string;
   password: string;
   profilePictureUrl?: string;
