@@ -32,7 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "Pending", preparing: "Preparing", ready: "Ready", completed: "Completed", cancelled: "Cancelled"
 };
 
-export function AdminOrders({ token, onNavigate, onLogout }: AdminOrdersProps) {
+export function AdminOrders({ token, onNavigate }: AdminOrdersProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

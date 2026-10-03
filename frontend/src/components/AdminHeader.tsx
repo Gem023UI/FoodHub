@@ -9,7 +9,7 @@ interface AdminHeaderProps {
   currentPage?: string;
 }
 
-export function AdminHeader({ onNavigate, token, onLogout, currentPage = "admin" }: AdminHeaderProps) {
+export function AdminHeader({ onNavigate, onLogout, currentPage = "admin" }: AdminHeaderProps) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogoutClick = () => setShowLogoutModal(true);

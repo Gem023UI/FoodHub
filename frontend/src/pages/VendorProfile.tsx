@@ -39,7 +39,6 @@ export function VendorProfile({
   token,
   userId,
   onNavigate,
-  onLogout,
   onProfileUpdate,
 }: VendorProfileProps) {
   const [profile, setProfile] = useState<VendorProfileData | null>(null);

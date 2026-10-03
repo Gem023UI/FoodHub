@@ -48,7 +48,7 @@ const EMPTY_FORM: ProductFormState = {
   productImages: [],
 };
 
-export function VendorProducts({ token, onNavigate, onLogout }: VendorProductsProps) {
+export function VendorProducts({ token, onNavigate }: VendorProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stall, setStall] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -10,7 +10,7 @@ interface VendorHeaderProps {
   currentPage?: string;
 }
 
-export function VendorHeader({ onNavigate, token, stallName, onLogout, currentPage = "vendor-stall" }: VendorHeaderProps) {
+export function VendorHeader({ onNavigate, stallName, onLogout, currentPage = "vendor-stall" }: VendorHeaderProps) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogoutClick = () => setShowLogoutModal(true);

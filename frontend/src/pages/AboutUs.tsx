@@ -7,7 +7,7 @@ interface AboutUsProps {
   onLogout?: () => void;
 }
 
-export function AboutUs({ onNavigate, token, onLogout }: AboutUsProps) {
+export function AboutUs({ onNavigate }: AboutUsProps) {
   return (
     <div className="about-us-page">
       <div className="about-us-container">

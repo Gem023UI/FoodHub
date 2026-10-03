@@ -97,7 +97,7 @@ const CHART_COLORS = [
   '#3498db', '#e74c3c'
 ];
 
-export function AdminStalls({ token, onNavigate, onLogout }: AdminStallsProps) {
+export function AdminStalls({ token, onNavigate }: AdminStallsProps) {
   const [stalls, setStalls] = useState<Stall[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

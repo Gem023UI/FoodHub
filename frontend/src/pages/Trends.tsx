@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { Footer } from "../components/Footer";
 import Loader from "../components/Loader";
-import { ProductCard } from "../components/ProductCard";
 import { 
   getTopFavoritesByCourse,
   getTopFavoritesByPeriod,
   getAllStallsWithFavorites,
   type TopFavoriteItem
 } from "../services/favorite.service";
-import type { Product } from "../services/product.service";
 import "../styles/Trends.css";
 
 const CATEGORIES = ["Rice Meal", "Beverage", "Snacks", "Add-ons"];
@@ -36,7 +34,7 @@ interface TrendsProps {
   onBack: () => void;
 }
 
-export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsProps) {
+export default function Trends({ onNavigate, onBack }: TrendsProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'course' | 'period'>('course');
@@ -56,10 +54,6 @@ export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsPr
   useEffect(() => {
     loadCourseWinners(selectedCourse);
   }, [selectedCourse]);
-
-  useEffect(() => {
-    loadPeriodWinners(selectedPeriod);
-  }, [selectedPeriod]);
 
   async function loadTrends() {
     setIsLoading(true);
@@ -104,41 +98,6 @@ export default function Trends({ token, onNavigate, onLogout, onBack }: TrendsPr
     }
   }
 
-  async function loadPeriodWinners(period: 'today' | 'week' | 'month' | 'all') {
-    // Data is already loaded, just update the view
-  }
-
-  function renderProductCard(item: TopFavoriteItem, key: string) {
-    const product: Product = {
-      _id: item.productId,
-      productName: item.productName,
-      productDescription: item.productDescription || "",
-      productImages: item.productImages || [],
-      category: item.category as any,
-      price: item.price,
-      nutrition: item.nutrition || { calories: null, protein: null, carbs: null, allergen: "" },
-      favorite: item.favorite || item.favoriteCount || 0,
-      stocks: 0,
-      available: true,
-      reviews: [],
-      averageRating: 0,
-      reviewCount: 0,
-      stallId: {
-        _id: item.stallId,
-        stallName: item.stallName,
-        stallPicture: null
-      }
-    };
-
-    return (
-      <ProductCard
-        key={key}
-        product={product}
-        token={token}
-        onClick={() => onNavigate(`product/${item.productId}`)}
-      />
-    );
-  }
 
   // Get top 3 items for a category
   function getTopItems(items: TopFavoriteItem[], count: number = 3) {

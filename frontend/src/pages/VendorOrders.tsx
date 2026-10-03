@@ -14,7 +14,7 @@ interface VendorOrdersProps {
 
 type StatusFilter = "all" | "pending" | "preparing" | "ready" | "completed" | "cancelled";
 
-export function VendorOrders({ token, onNavigate, onLogout }: VendorOrdersProps) {
+export function VendorOrders({ token, onNavigate }: VendorOrdersProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

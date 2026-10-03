@@ -41,7 +41,7 @@ interface AdminVendorsProps {
   onLogout?: () => void;
 }
 
-export function AdminVendors({ token, onNavigate, onLogout }: AdminVendorsProps) {
+export function AdminVendors({ token, onNavigate }: AdminVendorsProps) {
   const [stalls, setStalls] = useState<AdminStallItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

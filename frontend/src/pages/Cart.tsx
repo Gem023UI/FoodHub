@@ -37,7 +37,7 @@ interface CartProps {
   onLogout?: () => void;
 }
 
-export function Cart({ token, onNavigate, onLogout }: CartProps) {
+export function Cart({ onNavigate }: CartProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

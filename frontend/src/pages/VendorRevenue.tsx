@@ -36,7 +36,7 @@ interface VendorRevenueProps {
 
 type PeriodType = "daily" | "weekly" | "monthly";
 
-export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProps) {
+export function VendorRevenue({ token, onNavigate }: VendorRevenueProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,12 +165,11 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
     });
   }
 
-  function getCurrentData() {
-    switch (period) {
-      case "daily": return revenueData.daily;
-      case "weekly": return revenueData.weekly;
-      case "monthly": return revenueData.monthly;
-      default: return revenueData.daily;
+  function getCurrentData(): { label: string; amount: number }[] {
+   switch (period) {
+     case "weekly": return revenueData.weekly.map(d => ({ label: d.week, amount: d.amount }));
+     case "monthly": return revenueData.monthly.map(d => ({ label: d.month, amount: d.amount }));
+     default: return revenueData.daily.map(d => ({ label: d.date, amount: d.amount }));
     }
   }
 
@@ -271,11 +270,7 @@ export function VendorRevenue({ token, onNavigate, onLogout }: VendorRevenueProp
             <div className="chart-bars">
               {currentData.map((item, index) => {
                 const height = maxRevenue > 0 ? (item.amount / maxRevenue) * 100 : 0;
-                const label = period === "daily" 
-                  ? item.date.slice(5) 
-                  : period === "weekly"
-                  ? item.week.slice(5)
-                  : item.month.slice(5);
+                const label = item.label.slice(5);
 
                 return (
                   <div key={index} className="chart-bar-wrapper">

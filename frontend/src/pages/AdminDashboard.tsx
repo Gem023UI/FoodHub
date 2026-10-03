@@ -80,7 +80,7 @@ const VENDOR_STATUS_COLORS: Record<string, string> = {
   suspended: '#9b59b6',
 };
 
-export function AdminDashboard({ token, onNavigate, onLogout }: AdminDashboardProps) {
+export function AdminDashboard({ token, onNavigate }: AdminDashboardProps) {
   const [insights, setInsights] = useState<any>(null);
   const [orderInsights, setOrderInsights] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -402,7 +402,6 @@ export function AdminDashboard({ token, onNavigate, onLogout }: AdminDashboardPr
   const stallStats = insights?.stalls || {};
   const orderStats = insights?.orders || {};
   const vendorStats = insights?.vendors || {};
-  const revenueStats = orderInsights || {};
 
   // ── Derived text helpers ──────────────────────────────────────────
   const verifiedPct = studentStats.verified && stats.totalStudents

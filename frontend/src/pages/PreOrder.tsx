@@ -35,7 +35,7 @@ interface PreorderProps {
   };
 }
 
-export function Preorder({ token, onNavigate, onLogout, preorderData }: PreorderProps) {
+export function Preorder({ token, onNavigate, preorderData }: PreorderProps) {
   const [items, setItems] = useState<PreorderItem[]>([]);
   const [stallId, setStallId] = useState<string>("");
   const [stallName, setStallName] = useState<string>("");

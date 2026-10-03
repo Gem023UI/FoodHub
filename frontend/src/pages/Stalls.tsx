@@ -15,7 +15,7 @@ interface StallPageProps {
   onLogout?: () => void;
 }
 
-export function Stall({ stallId, token, onNavigate, onLogout }: StallPageProps) {
+export function Stall({ stallId, token, onNavigate }: StallPageProps) {
   const [stall, setStall] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -26,7 +26,7 @@ const PAYMENT_LABELS: Record<Order["paymentMethod"], string> = {
   paymaya: "Maya",
 };
 
-export function StudentOrders({ token, onNavigate, onLogout }: StudentOrdersProps) {
+export function StudentOrders({ token, onNavigate }: StudentOrdersProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -63,7 +63,7 @@ const CHART_COLORS = [
 
 const STUDENT_STATUSES = ["verified", "unverified", "deactivated"];
 
-export function AdminStudents({ token, onNavigate, onLogout }: AdminStudentsProps) {
+export function AdminStudents({ token, onNavigate }: AdminStudentsProps) {
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export function AdminStudents({ token, onNavigate, onLogout }: AdminStudentsProp
   const [registrationData, setRegistrationData] = useState<any>(null);
   const [courseDistributionData, setCourseDistributionData] = useState<any>(null);
   const [verifiedComparisonData, setVerifiedComparisonData] = useState<any>(null);
-  const [period, setPeriod] = useState<'weekly' | 'monthly' | 'custom'>('weekly');
+  const [period] = useState<'weekly' | 'monthly' | 'custom'>('weekly');
 
   // Inline status edit + delete modal (same pattern as vendors)
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);

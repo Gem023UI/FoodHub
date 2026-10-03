@@ -27,7 +27,7 @@ interface AdminProfileProps {
 // ── API Base URL ────────────────────────────────────────────────────────
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
-export function AdminProfile({ token, userId, onNavigate, onLogout }: AdminProfileProps) {
+export function AdminProfile({ token, userId, onNavigate }: AdminProfileProps) {
   const [profile, setProfile] = useState<AdminProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

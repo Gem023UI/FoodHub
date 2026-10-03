@@ -5,7 +5,7 @@ import Lanyard from "../components/Lanyard";
 import Loader from "../components/Loader";
 import { getMe, updateMyProfile, uploadStudentPicture } from "../services/user.service";
 import { getFavorites } from "../services/favorite.service";
-import { getStudentOrders, getStudentOrdersWithDateRange, type Order } from "../services/order.service";
+import { getStudentOrders, getStudentOrdersWithDateRange } from "../services/order.service";
 import { getProductDetails, type Product } from "../services/product.service";
 import {
   getStudentBudgetCaps,
@@ -152,11 +152,8 @@ function RangeDropdown({
   );
 }
 
-function orderStatusIcon(status: string) {
-  return status === "completed" ? "fa-eye" : "fa-clock";
-}
 
-export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
+export function Profile({ token, userId, onNavigate }: ProfileProps) {
   const [student, setStudent] = useState<any>(null);
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [orders, setOrders] = useState<OrderLike[]>([]);
@@ -182,7 +179,7 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
   const [newBudgetStart, setNewBudgetStart] = useState(isoDate(new Date()));
   const [newBudgetEnd, setNewBudgetEnd] = useState(isoDate(new Date()));
   const [isSavingBudget, setIsSavingBudget] = useState(false);
-  const [spendingData, setSpendingData] = useState<any>(null);
+  const [, setSpendingData] = useState<any>(null);
   const [showBudgetRecords, setShowBudgetRecords] = useState(false);
   const [capPendingDelete, setCapPendingDelete] = useState<StudentBudgetCap | null>(null);
   const [isDeletingCap, setIsDeletingCap] = useState(false);
@@ -472,7 +469,6 @@ export function Profile({ token, userId, onNavigate, onLogout }: ProfileProps) {
     return activeBudget.currentBudget;
   }, [activeBudget]);
 
-  const canAddNextBudget = useMemo(() => !activeBudget, [activeBudget]);
 
   // ── Section 4 derived data ──
   const rangedOrders = useMemo(() => {
